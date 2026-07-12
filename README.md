@@ -33,10 +33,17 @@ To make settings and the physical deck order perpetual across browsers and sessi
 node server.js
 ```
 
-Then visit `http://localhost:8000`. The app stores shared settings, AI provider configuration, Ollama model choices, and the current physical deck order in `data/server-state.json`. Set `PORT` to choose a different port, or `TAROT_DATA_DIR` to store the state file somewhere outside the repository:
+Then visit `http://localhost:8000`. The app stores shared settings, AI provider configuration, Ollama model choices, and the current physical deck order in `data/server-state.json`. The server also mirrors the tarot card metadata and card artwork from GitHub into `data/assets/` on startup or the first `/assets/` request when the cache is missing, then serves them locally from `/assets/tarot-images.json` and `/assets/cards/<image>.jpg` so browsers do not repeatedly contact GitHub for card assets. Set `PORT` to choose a different port, `TAROT_DATA_DIR` to store state and cached assets somewhere outside the repository, or `TAROT_ASSET_CACHE_DIR` to store only the mirrored tarot assets elsewhere:
 
 ```bash
 PORT=3018 TAROT_DATA_DIR=/var/lib/cosmic-tarot node server.js
+TAROT_ASSET_CACHE_DIR=/var/cache/cosmic-tarot-assets node server.js
+```
+
+To refresh the mirrored card metadata and images on demand, run:
+
+```bash
+node server.js --refresh-assets
 ```
 
 If the page is opened directly from disk or served without `server.js`, Cosmic Tarot automatically falls back to browser-local storage.
@@ -50,7 +57,7 @@ Use the included deployment script to build a minimal Node.js image and run Cosm
 ./deploy.sh 8080
 ```
 
-Then visit `http://localhost:3018` unless you selected a custom port. Docker deployments keep server-side settings and deck order in the `cosmic-tarot-data` Docker volume.
+Then visit `http://localhost:3018` unless you selected a custom port. Docker deployments keep server-side settings, deck order, and mirrored tarot assets in the `cosmic-tarot-data` Docker volume.
 
 ### Optional AI setup
 
@@ -75,8 +82,7 @@ Without AI configuration, the app still supports card drawing, card flipping, bu
 
 ## Roadmap
 
-- Add offline-friendly bundled card artwork and meanings.
-- Provide saved reading history and export/share options.
+- Add saved reading history and export/share options.
 - Add more spread layouts, such as Celtic Cross and relationship spreads.
 - Improve accessibility for keyboard navigation and screen readers.
 - Add automated tests and a lightweight development workflow for future changes.
