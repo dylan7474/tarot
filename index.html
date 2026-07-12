@@ -264,11 +264,11 @@
 
                 <!-- ================= THE PHYSICAL DECK RIBBON SPREAD ================= -->
                 <div id="ribbon-spread-section" class="hidden w-full max-w-4xl bg-cosmic-900/30 border border-cosmic-800/60 rounded-2xl p-6 mb-8 text-center space-y-4">
-                    <span class="text-xs font-mono tracking-widest text-cosmic-300 uppercase">The Ribbon Spread: Choose Your Cards</span>
+                    <span id="ribbon-spread-title" class="text-xs font-mono tracking-widest text-cosmic-300 uppercase">The Ribbon Spread: Choose Your Cards</span>
                     <div id="ribbon-spread-scroll" class="relative w-full h-72 sm:h-80 overflow-hidden flex justify-center mt-4">
                         <!-- Dynamic face-down fanned cards loaded here in a gorgeous crescent arch -->
                     </div>
-                    <p class="text-[10px] text-cosmic-300 font-mono tracking-widest uppercase">Click any card from the ribbon spread above to deal it to the next empty slot!</p>
+                    <p id="ribbon-spread-instruction" class="text-[10px] text-cosmic-300 font-mono tracking-widest uppercase">Click any card from the ribbon spread above to deal it to the next empty slot!</p>
                 </div>
 
                 <!-- ================= PHYSICAL DECK ALTER TABLE (MANUAL MODE ONLY) ================= -->
@@ -585,6 +585,7 @@
         let shuffleMode = 'automatic'; // 'automatic' or 'manual'
         let physicalDeck = [];         // Active deck of 78 cards: array of { cardObj, isReversed: bool }
         let cutPiles = null;           // When cut: { left: [], right: [] }
+        let manualActionMode = null;   // When set, ribbon clicks choose shuffle/cut points instead of drawing
 
         let aiProvider = 'gemini';
         let ollamaAddress = 'http://localhost:11434';
@@ -936,6 +937,7 @@
                 });
             });
             cutPiles = null;
+            manualActionMode = null;
             updateAltarView();
             renderRibbonSpread();
         }
@@ -943,6 +945,7 @@
         // Set alignment shuffle protocol (auto vs manual)
         function setShuffleMode(mode) {
             shuffleMode = mode;
+            manualActionMode = null;
             const btnAuto = document.getElementById('btn-shuffle-auto');
             const btnManual = document.getElementById('btn-shuffle-manual');
             const altar = document.getElementById('altar-table');
@@ -988,11 +991,25 @@
             const hasVacantSlots = SPREADS[currentSpread].some((_, idx) => drawnCards[idx] === undefined);
             
             // Render only in whole manual mode with space left on board
-            if (shuffleMode === 'manual' && cutPiles === null && hasVacantSlots && physicalDeck.length > 0) {
+            const shouldShowRibbon = shuffleMode === 'manual' && cutPiles === null && physicalDeck.length > 0 && (hasVacantSlots || manualActionMode !== null);
+            if (shouldShowRibbon) {
                 ribbonSection.classList.remove('hidden');
             } else {
                 ribbonSection.classList.add('hidden');
                 return;
+            }
+
+            const ribbonTitle = document.getElementById('ribbon-spread-title');
+            const ribbonInstruction = document.getElementById('ribbon-spread-instruction');
+            if (manualActionMode === 'overhand') {
+                ribbonTitle.innerText = "The Ribbon Spread: Choose an Overhand Packet";
+                ribbonInstruction.innerText = "Click the last card of the packet you want to lift from the top, then drop behind the remaining deck.";
+            } else if (manualActionMode === 'cut') {
+                ribbonTitle.innerText = "The Ribbon Spread: Choose the Cut Point";
+                ribbonInstruction.innerText = "Click the card where your left-hand pile should end; the remaining cards become the right-hand pile.";
+            } else {
+                ribbonTitle.innerText = "The Ribbon Spread: Choose Your Cards";
+                ribbonInstruction.innerText = "Click any card from the ribbon spread above to deal it to the next empty slot!";
             }
 
             ribbonScroll.innerHTML = '';
@@ -1026,9 +1043,21 @@
                     </div>
                 `;
 
-                cardEl.addEventListener('click', () => drawCardFromRibbon(index));
+                cardEl.addEventListener('click', () => handleRibbonCardClick(index));
                 ribbonScroll.appendChild(cardEl);
             });
+        }
+
+        function handleRibbonCardClick(index) {
+            if (manualActionMode === 'overhand') {
+                completeOverhandShuffleAt(index);
+                return;
+            }
+            if (manualActionMode === 'cut') {
+                completeCutDeckAt(index);
+                return;
+            }
+            drawCardFromRibbon(index);
         }
 
         // Draw specific fanned card from hand selection ribbon spread
@@ -1154,48 +1183,54 @@
 
         // Handle Overhand Shuffle Protocol
         function triggerOverhandShuffle() {
-            if (physicalDeck.length < 5) return;
+            if (physicalDeck.length < 2 || cutPiles !== null) return;
+            manualActionMode = 'overhand';
+            playChime("C4");
+            document.getElementById('altar-status').innerText = "Choose an overhand packet from the ribbon";
+            document.getElementById('altar-instruction').innerText = "Click a card in the ribbon to set the packet size; no random numbers are used.";
+            renderRibbonSpread();
+        }
+
+        function completeOverhandShuffleAt(index) {
+            const packetEnd = Math.min(index + 1, physicalDeck.length - 1);
+            if (packetEnd < 1) return;
             playRustle();
             playChime("C4");
 
-            // Cut random block chunks and swap them bottom to top 5 times
-            for (let s = 0; s < 5; s++) {
-                const numBlocks = 3 + Math.floor(Math.random() * 3);
-                let currentStack = [...physicalDeck];
-                let shuffledStack = [];
-
-                while (currentStack.length > 0) {
-                    const chunkSize = Math.min(currentStack.length, 5 + Math.floor(Math.random() * 15));
-                    const chunk = currentStack.splice(currentStack.length - chunkSize, chunkSize);
-                    shuffledStack = shuffledStack.concat(chunk);
-                }
-                physicalDeck = shuffledStack;
-            }
+            const liftedPacket = physicalDeck.slice(0, packetEnd);
+            const remainingDeck = physicalDeck.slice(packetEnd);
+            physicalDeck = remainingDeck.concat(liftedPacket);
+            manualActionMode = null;
 
             const statusText = document.getElementById('altar-status');
-            statusText.innerText = "Overhand shuffled!";
+            statusText.innerText = `Overhand packet moved: ${liftedPacket.length} Cards`;
             statusText.className = "text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20";
-            
-            setTimeout(() => { 
-                updateAltarView(); 
-                renderRibbonSpread();
-            }, 300);
+            updateAltarView();
+            renderRibbonSpread();
         }
 
         // Cut the active physical deck stack
         function triggerCutDeck() {
-            if (physicalDeck.length < 10) return;
+            if (physicalDeck.length < 2 || cutPiles !== null) return;
+            manualActionMode = 'cut';
+            playChime("G4");
+            document.getElementById('altar-status').innerText = "Choose a cut point from the ribbon";
+            document.getElementById('altar-instruction').innerText = "Click the ribbon card where the left pile should end.";
+            renderRibbonSpread();
+        }
+
+        function completeCutDeckAt(index) {
+            const cutIndex = Math.min(Math.max(index + 1, 1), physicalDeck.length - 1);
             playRustle();
             playChime("G4");
-
-            const depthFraction = parseInt(document.getElementById('cut-slider').value) / 100;
-            const cutIndex = Math.floor(physicalDeck.length * depthFraction);
 
             cutPiles = {
                 left: physicalDeck.slice(0, cutIndex),
                 right: physicalDeck.slice(cutIndex)
             };
-
+            manualActionMode = null;
+            document.getElementById('cut-slider').value = Math.round((cutIndex / physicalDeck.length) * 100);
+            updateCutSliderValue();
             updateAltarView();
             renderRibbonSpread();
         }
@@ -1269,19 +1304,13 @@
             let right = [...cutPiles.right];
             let merged = [];
 
-            // Simulating real human thumb releases: randomly drop 1 to 3 cards alternately from either hand
+            // Deterministic hand merge: the user's cut point controls pile sizes, then cards fall alternately.
             while (left.length > 0 || right.length > 0) {
                 if (left.length > 0) {
-                    const dropCount = Math.min(left.length, 1 + Math.floor(Math.random() * 3));
-                    for (let i = 0; i < dropCount; i++) {
-                        merged.push(left.shift());
-                    }
+                    merged.push(left.shift());
                 }
                 if (right.length > 0) {
-                    const dropCount = Math.min(right.length, 1 + Math.floor(Math.random() * 3));
-                    for (let i = 0; i < dropCount; i++) {
-                        merged.push(right.shift());
-                    }
+                    merged.push(right.shift());
                 }
             }
 
