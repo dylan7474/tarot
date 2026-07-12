@@ -25,6 +25,17 @@ python3 -m http.server 8000
 
 Then visit `http://localhost:8000`.
 
+### Deploy with Docker
+
+Use the included deployment script to build a minimal Nginx image and run Cosmic Tarot in Docker. The script defaults to port `3018`, or you can pass a different port as the first argument.
+
+```bash
+./deploy.sh
+./deploy.sh 8080
+```
+
+Then visit `http://localhost:3018` unless you selected a custom port.
+
 ### Optional AI setup
 
 Open **AI Setup** in the app header to configure one of the supported providers:
