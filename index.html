@@ -349,7 +349,7 @@
                 <div class="pt-2 pb-1">
                     <label for="oracle-question" class="block text-[10px] font-mono tracking-widest text-cosmic-300 uppercase mb-2">Engrave Your Question Here</label>
                     <div class="relative max-w-lg mx-auto">
-                        <input type="text" id="oracle-question" placeholder="E.g., What career moves should I initiate over the next six months?" class="w-full bg-cosmic-950/70 border border-cosmic-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cosmic-300 focus:ring-1 focus:ring-cosmic-300 placeholder-cosmic-300/40 text-center transition-all duration-300">
+                        <input type="text" id="oracle-question" oninput="saveUserSettings()" placeholder="E.g., What career moves should I initiate over the next six months?" class="w-full bg-cosmic-950/70 border border-cosmic-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cosmic-300 focus:ring-1 focus:ring-cosmic-300 placeholder-cosmic-300/40 text-center transition-all duration-300">
                         <div class="absolute inset-0 rounded-xl pointer-events-none border border-cosmic-500/10 shadow-[0_0_15px_rgba(92,51,166,0.1)]"></div>
                     </div>
                 </div>
@@ -731,10 +731,56 @@
         let manualActionMode = null;   // When set, ribbon clicks choose shuffle/cut points instead of drawing
         let manualDeckPrepared = false; // Manual readings require a shuffle/cut action before card selection opens
         const PHYSICAL_DECK_STORAGE_KEY = 'cosmic_tarot_physical_deck_v1';
+        const USER_SETTINGS_STORAGE_KEY = 'cosmic_tarot_user_settings_v1';
 
         let aiProvider = 'gemini';
         let ollamaAddress = 'http://localhost:11434';
         let ollamaModel = '';
+
+        function getStoredUserSettings() {
+            const defaults = {
+                activeMode: 'readings',
+                currentSpread: 'single',
+                shuffleMode: 'automatic',
+                oracleQuestion: '',
+                explorerSearch: '',
+                explorerCategory: 'all'
+            };
+
+            try {
+                return { ...defaults, ...JSON.parse(localStorage.getItem(USER_SETTINGS_STORAGE_KEY) || '{}') };
+            } catch (error) {
+                console.warn('Stored user settings could not be restored. Resetting preferences.', error);
+                localStorage.removeItem(USER_SETTINGS_STORAGE_KEY);
+                return defaults;
+            }
+        }
+
+        function saveUserSettings() {
+            const questionInput = document.getElementById('oracle-question');
+            const searchInput = document.getElementById('search-input');
+            const settings = {
+                activeMode,
+                currentSpread,
+                shuffleMode,
+                oracleQuestion: questionInput ? questionInput.value : '',
+                explorerSearch: searchInput ? searchInput.value : '',
+                explorerCategory: selectedCategory
+            };
+
+            localStorage.setItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+        }
+
+        function restoreUserSettings() {
+            const settings = getStoredUserSettings();
+            activeMode = ['readings', 'explorer'].includes(settings.activeMode) ? settings.activeMode : 'readings';
+            currentSpread = Object.prototype.hasOwnProperty.call(SPREADS, settings.currentSpread) ? settings.currentSpread : 'single';
+            shuffleMode = ['automatic', 'manual'].includes(settings.shuffleMode) ? settings.shuffleMode : 'automatic';
+            selectedCategory = ['all', 'major', 'wands', 'cups', 'swords', 'pentacles'].includes(settings.explorerCategory) ? settings.explorerCategory : 'all';
+
+            document.getElementById('oracle-question').value = settings.oracleQuestion || '';
+            document.getElementById('search-input').value = settings.explorerSearch || '';
+        }
 
         // Load stored API key if present on page load
         window.addEventListener('DOMContentLoaded', () => {
@@ -766,6 +812,7 @@
                 populateModelDropdown(JSON.parse(storedOllamaModels), ollamaModel);
             }
 
+            restoreUserSettings();
             switchProvider(aiProvider, false);
             updateApiStatusBadge();
             fetchTarotAssets();
@@ -1042,12 +1089,16 @@
 
             // Populates the primary arrays with valid data
             initializePhysicalDeck();
+            updateSpreadButtons();
+            updateShuffleModeControls();
+            switchMode(activeMode, false);
             setupSpreadBoard();
-            renderExplorerGrid(deck);
+            setExplorerCategoryButton(selectedCategory);
+            filterDeck(false);
         }
 
         // 2. View Switching Setup
-        function switchMode(mode) {
+        function switchMode(mode, save = true) {
             activeMode = mode;
             const readingsSection = document.getElementById('section-readings');
             const explorerSection = document.getElementById('section-explorer');
@@ -1067,6 +1118,8 @@
                 btnReadings.className = "px-5 py-2 rounded-full text-sm font-semibold text-cosmic-300 hover:text-cosmic-100 transition-all duration-200";
                 btnExplorer.className = "px-5 py-2 rounded-full text-sm font-semibold bg-cosmic-500 text-white shadow-lg shadow-cosmic-500/20 transition-all duration-200";
             }
+
+            if (save) saveUserSettings();
         }
 
         // ================= PHYSICAL SIMULATOR DECK LOGIC =================
@@ -1146,13 +1199,26 @@
             playChime("C4");
         }
 
+        function updateShuffleModeControls() {
+            const btnAuto = document.getElementById('btn-shuffle-auto');
+            const btnManual = document.getElementById('btn-shuffle-manual');
+            const altar = document.getElementById('altar-table');
+
+            if (shuffleMode === 'manual') {
+                btnManual.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-cosmic-500 text-white transition-all duration-200";
+                btnAuto.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-cosmic-300 hover:text-white transition-all duration-200";
+                altar.classList.remove('hidden');
+            } else {
+                btnAuto.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-cosmic-500 text-white transition-all duration-200";
+                btnManual.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-cosmic-300 hover:text-white transition-all duration-200";
+                altar.classList.add('hidden');
+            }
+        }
+
         // Set alignment shuffle protocol (auto vs manual)
         function setShuffleMode(mode) {
             shuffleMode = mode;
             manualActionMode = null;
-            const btnAuto = document.getElementById('btn-shuffle-auto');
-            const btnManual = document.getElementById('btn-shuffle-manual');
-            const altar = document.getElementById('altar-table');
             const dealBtn = document.getElementById('deal-button');
 
             if (window.Tone && Tone.context.state !== 'running') {
@@ -1161,10 +1227,7 @@
             }
 
             if (mode === 'manual') {
-                btnManual.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-cosmic-500 text-white transition-all duration-200";
-                btnAuto.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-cosmic-300 hover:text-white transition-all duration-200";
-                altar.classList.remove('hidden');
-                
+                updateShuffleModeControls();
                 // When in manual simulator mode, disable instant automatic dealing
                 dealBtn.classList.add('hidden');
                 document.getElementById('board-instruction').innerText = "Begin with a shuffle or cut on the Altar; the selection ribbon opens after the deck is prepared.";
@@ -1172,15 +1235,13 @@
                 initializePhysicalDeck();
                 setupSpreadBoard();
             } else {
-                btnAuto.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-cosmic-500 text-white transition-all duration-200";
-                btnManual.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-cosmic-300 hover:text-white transition-all duration-200";
-                altar.classList.add('hidden');
-                
+                updateShuffleModeControls();
                 dealBtn.classList.remove('hidden');
                 document.getElementById('board-instruction').innerText = "Click Shuffle & Draw to start your reading";
                 
                 setupSpreadBoard();
             }
+            saveUserSettings();
             playChime("F4");
         }
 
@@ -1655,6 +1716,19 @@
             ]
         };
 
+        function updateSpreadButtons() {
+            const btnSingle = document.getElementById('btn-spread-single');
+            const btnThree = document.getElementById('btn-spread-three');
+
+            if (currentSpread === 'single') {
+                btnSingle.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-cosmic-500 text-white transition-all duration-200";
+                btnThree.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-cosmic-300 hover:text-white transition-all duration-200";
+            } else {
+                btnThree.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-cosmic-500 text-white transition-all duration-200";
+                btnSingle.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-cosmic-300 hover:text-white transition-all duration-200";
+            }
+        }
+
         function selectSpread(type) {
             currentSpread = type;
             
@@ -1665,17 +1739,7 @@
             }
             playChime("E4");
 
-            // Update UI buttons
-            const btnSingle = document.getElementById('btn-spread-single');
-            const btnThree = document.getElementById('btn-spread-three');
-
-            if (type === 'single') {
-                btnSingle.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-cosmic-500 text-white transition-all duration-200";
-                btnThree.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-cosmic-300 hover:text-white transition-all duration-200";
-            } else {
-                btnThree.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-cosmic-500 text-white transition-all duration-200";
-                btnSingle.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-cosmic-300 hover:text-white transition-all duration-200";
-            }
+            updateSpreadButtons();
 
             // Clear Altar splits if any, re-integrate before redefining board
             if (cutPiles !== null) {
@@ -1684,6 +1748,7 @@
             }
 
             setupSpreadBoard();
+            saveUserSettings();
         }
 
         function setupSpreadBoard() {
@@ -1825,6 +1890,7 @@
         function resetReading() {
             // Clear current input question
             document.getElementById('oracle-question').value = '';
+            saveUserSettings();
 
             // Clean the reading layout while preserving the perpetual physical deck.
             if (cutPiles !== null) {
@@ -2119,20 +2185,23 @@ Please provide a brief, tailored reading (maximum 3 short paragraphs). Do not gi
             });
         }
 
+        function setExplorerCategoryButton(category) {
+            const buttons = document.querySelectorAll('.explorer-filter-btn');
+            buttons.forEach(button => {
+                const isActive = button.getAttribute('onclick').includes(`'${category}'`);
+                button.className = isActive
+                    ? "explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-500 text-white font-medium transition"
+                    : "explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition";
+            });
+        }
+
         function filterCategory(btn, category) {
             selectedCategory = category;
-            
-            // Toggle active style on category pills
-            const buttons = document.querySelectorAll('.explorer-filter-btn');
-            buttons.forEach(b => {
-                b.className = "explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition";
-            });
-            btn.className = "explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-500 text-white font-medium transition";
-
+            setExplorerCategoryButton(category);
             filterDeck();
         }
 
-        function filterDeck() {
+        function filterDeck(save = true) {
             const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
             
             let filtered = deck;
@@ -2155,6 +2224,7 @@ Please provide a brief, tailored reading (maximum 3 short paragraphs). Do not gi
             }
 
             renderExplorerGrid(filtered);
+            if (save) saveUserSettings();
         }
 
         // 7. Modal Operations
