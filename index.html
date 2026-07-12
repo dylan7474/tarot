@@ -1000,12 +1000,17 @@
                 return `- Position [${spreadSlot.label} (${spreadSlot.desc})]: Card "${draw.card.name}" ${draw.isReversed ? 'Reversed' : 'Upright'}. Keywords: ${keywords.join(', ')}`;
             }).join('\n');
 
-            // Construct System prompt instructions
-            const systemPrompt = "You are a world-class, deeply intuitive Tarot Card Reader and Cosmic Oracle. Provide a mystical, highly empathetic, and insightful reading. Format your response cleanly using structured headings (###), bullet points, and paragraph divisions.";
+            // Construct System prompt instructions (Direct, concise, and focused on the query)
+            const systemPrompt = "You are an intuitive, direct, and empathetic Tarot Reader. Deliver a brief, highly focused reading (maximum 3 concise paragraphs). Avoid listing generic card definitions or reciting book descriptions. Instead, immediately address the seeker's question, synthesizing what the cards mean specifically in the context of their query.";
             
             // Construct user prompt with optional custom question
-            const finalQuestion = userQuestion || "A general guidance query on alignment and momentum.";
-            const userPrompt = `A seeker asks: "${finalQuestion}"\n\nThey have drawn the following tarot card configurations:\n${cardsInfo}\n\nSynthesize the specific card placements and alignments to answer their query with cosmic wisdom.`;
+            const finalQuestion = userQuestion || "A general guidance query on cosmic alignment and current life momentum.";
+            const userPrompt = `Seeker's Question: "${finalQuestion}"
+
+Drawn Cards & Placements:
+${cardsInfo}
+
+Please provide a brief, tailored reading (maximum 3 short paragraphs). Do not give raw keyword lists or generic copy-pasted definitions. For each card drawn, explain only what it means specifically in direct relation to the seeker's question, and finish with a single sentence summarizing the core advice. Keep it compact, targeted, and powerful.`;
 
             try {
                 let text = "";
