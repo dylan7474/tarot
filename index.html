@@ -28,6 +28,11 @@
                             500: '#5c33a6',
                             300: '#9d4edf',
                             100: '#e2d4f7'
+                        },
+                        aurora: {
+                            gold: '#f7d77b',
+                            rose: '#f59ac2',
+                            cyan: '#7dd3fc'
                         }
                     }
                 }
@@ -36,58 +41,142 @@
     </script>
 
     <style>
+        :root {
+            color-scheme: dark;
+            --card-border: rgba(247, 215, 123, 0.38);
+            --glass-border: rgba(226, 212, 247, 0.14);
+            --glass-surface: rgba(12, 7, 33, 0.72);
+        }
+
         body {
-            background-color: #06020f;
-            background-image: 
-                radial-gradient(circle at 20% 30%, rgba(92, 51, 166, 0.15) 0%, transparent 40%),
-                radial-gradient(circle at 80% 70%, rgba(157, 78, 223, 0.1) 0%, transparent 40%);
+            background:
+                radial-gradient(circle at top left, rgba(125, 211, 252, 0.16), transparent 28rem),
+                radial-gradient(circle at 82% 12%, rgba(245, 154, 194, 0.13), transparent 26rem),
+                radial-gradient(circle at 50% 95%, rgba(92, 51, 166, 0.28), transparent 35rem),
+                linear-gradient(135deg, #04010a 0%, #0b0621 48%, #12091f 100%);
             background-attachment: fixed;
         }
 
-        /* 3D Flip Card Effect */
-        .card-container {
-            perspective: 1000px;
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            pointer-events: none;
+            background-image:
+                radial-gradient(circle, rgba(255,255,255,0.52) 0 1px, transparent 1.6px),
+                radial-gradient(circle, rgba(247,215,123,0.42) 0 1px, transparent 1.8px);
+            background-position: 0 0, 3rem 4rem;
+            background-size: 7rem 7rem, 11rem 11rem;
+            opacity: 0.18;
+            mask-image: linear-gradient(to bottom, black, transparent 82%);
         }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background:
+                linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 48px 48px;
+            opacity: 0.22;
+        }
+
+        .glass-panel {
+            background: linear-gradient(145deg, rgba(21, 13, 58, 0.78), rgba(6, 2, 15, 0.82));
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+
+        .hero-orb {
+            width: min(38vw, 21rem);
+            aspect-ratio: 1;
+            border-radius: 9999px;
+            background:
+                radial-gradient(circle at 35% 28%, rgba(255,255,255,0.9), rgba(247,215,123,0.42) 12%, transparent 25%),
+                radial-gradient(circle at 62% 66%, rgba(125,211,252,0.22), transparent 32%),
+                linear-gradient(145deg, rgba(157,78,223,0.34), rgba(6,2,15,0.08));
+            border: 1px solid rgba(247, 215, 123, 0.24);
+            box-shadow: 0 0 90px rgba(157, 78, 223, 0.26), inset 0 0 60px rgba(255,255,255,0.06);
+        }
+
+        .card-back-art {
+            position: relative;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at center, rgba(247, 215, 123, 0.16), transparent 24%),
+                linear-gradient(160deg, #11082c 0%, #05020d 48%, #1a0b2e 100%);
+        }
+
+        .card-back-art::before,
+        .card-back-art::after {
+            content: "";
+            position: absolute;
+            inset: 14%;
+            border: 1px solid rgba(247, 215, 123, 0.36);
+            border-radius: 9999px;
+        }
+
+        .card-back-art::after {
+            inset: 23%;
+            border-radius: 1.1rem;
+            transform: rotate(45deg);
+            border-color: rgba(125, 211, 252, 0.28);
+        }
+
+        .constellation-mark {
+            position: relative;
+            width: 3.4rem;
+            height: 3.4rem;
+            border-radius: 9999px;
+            border: 1px solid rgba(247, 215, 123, 0.42);
+            background: radial-gradient(circle, rgba(247, 215, 123, 0.22), transparent 58%);
+            box-shadow: 0 0 32px rgba(247, 215, 123, 0.16);
+        }
+
+        .constellation-mark::before,
+        .constellation-mark::after {
+            content: "";
+            position: absolute;
+            inset: 50% auto auto 50%;
+            width: 82%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(247,215,123,0.7), transparent);
+            transform: translate(-50%, -50%) rotate(28deg);
+        }
+
+        .constellation-mark::after { transform: translate(-50%, -50%) rotate(-62deg); }
+
+        .lux-button {
+            box-shadow: 0 16px 40px rgba(92, 51, 166, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        /* 3D Flip Card Effect */
+        .card-container { perspective: 1200px; }
         .card-inner {
             transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             transform-style: preserve-3d;
         }
-        .card-inner.flipped {
-            transform: rotateY(180deg);
-        }
-        .card-front, .card-back {
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-        }
-        .card-front {
-            transform: rotateY(180deg);
-        }
+        .card-inner.flipped { transform: rotateY(180deg); }
+        .card-front, .card-back { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .card-front { transform: rotateY(180deg); }
 
-        /* Custom Scrollbar for cosmic theme */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0c0721;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #5c33a6;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #9d4edf;
-        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0c0721; }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(#9d4edf, #5c33a6); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #f7d77b; }
 
-        /* Tactical 3D Stack shadows simulating physical deck depth */
         .deck-stack-3d {
-            box-shadow: 
-                0px 1px 0px rgba(92, 51, 166, 0.4),
+            box-shadow:
+                0px 1px 0px rgba(247, 215, 123, 0.3),
                 0px 2px 0px rgba(92, 51, 166, 0.35),
                 0px 3px 0px rgba(92, 51, 166, 0.3),
                 0px 4px 0px rgba(92, 51, 166, 0.25),
                 0px 6px 0px rgba(92, 51, 166, 0.2),
-                0px 8px 15px rgba(0, 0, 0, 0.6);
+                0px 18px 35px rgba(0, 0, 0, 0.55);
         }
     </style>
 </head>
@@ -96,7 +185,7 @@
     <header class="border-b border-cosmic-700/50 bg-cosmic-950/80 backdrop-blur-md sticky top-0 z-40 transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-3">
-                <span class="text-3xl">✨</span>
+                <span class="constellation-mark flex-none" aria-hidden="true"></span>
                 <div>
                     <h1 class="font-serif text-2xl font-bold tracking-widest text-cosmic-100 uppercase">Cosmic Tarot</h1>
                     <p class="text-xs text-cosmic-300 tracking-wider">A Digital Portal into the Arcana & AI Insight</p>
@@ -131,8 +220,9 @@
         
         <!-- ================= READINGS MODE CONTAINER ================= -->
         <section id="section-readings" class="space-y-8">
-            <div class="text-center max-w-2xl mx-auto space-y-3">
-                <h2 class="font-serif text-3xl text-cosmic-100">Consult the Oracle</h2>
+            <div class="relative text-center max-w-3xl mx-auto space-y-4 py-4">
+                <div class="hero-orb absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/4 opacity-40 blur-sm pointer-events-none" aria-hidden="true"></div>
+                <h2 class="relative font-serif text-4xl md:text-5xl text-cosmic-100 tracking-wide">Consult the Oracle</h2>
                 <p class="text-sm text-cosmic-300">Formulate your question, select your alignment method, and shuffle the arcana to uncover hidden timelines.</p>
                 
                 <!-- Astral Question Input Field -->
@@ -165,7 +255,7 @@
             </div>
 
             <!-- Reading Board Frame -->
-            <div class="bg-cosmic-950/60 rounded-3xl p-6 md:p-10 border border-cosmic-800/80 backdrop-blur-sm shadow-inner min-h-[500px] flex flex-col justify-between items-center relative overflow-hidden">
+            <div class="glass-panel rounded-[2rem] p-6 md:p-10 backdrop-blur-xl min-h-[500px] flex flex-col justify-between items-center relative overflow-hidden">
                 
                 <!-- Active Spread Layout Grid -->
                 <div id="spread-layout" class="flex flex-wrap justify-center items-center gap-8 md:gap-12 py-6 w-full min-h-[250px]">
@@ -249,7 +339,7 @@
                 <!-- Control Station -->
                 <div class="flex flex-col items-center gap-4 z-10">
                     <div class="flex flex-col sm:flex-row gap-4">
-                        <button id="deal-button" class="bg-gradient-to-r from-cosmic-500 to-cosmic-300 hover:scale-105 active:scale-95 text-white font-serif font-semibold tracking-wider text-lg px-8 py-4 rounded-xl shadow-lg shadow-cosmic-500/30 transition-all duration-300 cursor-pointer" onclick="dealSpread()">
+                        <button id="deal-button" class="lux-button bg-gradient-to-r from-cosmic-500 via-purple-500 to-aurora-gold hover:scale-105 active:scale-95 text-white font-serif font-semibold tracking-wider text-lg px-8 py-4 rounded-2xl transition-all duration-300 cursor-pointer" onclick="dealSpread()">
                             SHUFFLE & DRAW SPHERE
                         </button>
                         <button id="reset-button" class="hidden bg-cosmic-900 hover:bg-cosmic-800 border border-cosmic-700 text-cosmic-100 font-serif font-semibold tracking-wider text-lg px-8 py-4 rounded-xl shadow-md hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer" onclick="resetReading()">
@@ -931,10 +1021,8 @@
                 });
 
                 cardEl.innerHTML = `
-                    <div class="w-full h-full border border-cosmic-500/10 rounded-md flex flex-col justify-between items-center py-2 bg-gradient-to-b from-cosmic-950 to-cosmic-900">
-                        <span class="text-[10px] text-cosmic-500">🌙</span>
-                        <span class="text-cosmic-300 text-[8px]">✨</span>
-                        <span class="text-[10px] text-cosmic-500">☀️</span>
+                    <div class="card-back-art w-full h-full border border-aurora-gold/20 rounded-md flex items-center justify-center">
+                        <span class="constellation-mark scale-50"></span>
                     </div>
                 `;
 
@@ -1332,15 +1420,11 @@
                         <div id="card-inner-${index}" class="card-inner w-full h-full relative rounded-xl shadow-lg border border-cosmic-700/50">
                             
                             <!-- Card Back: Elegant Cosmic Geometric Art -->
-                            <div class="card-back absolute inset-0 bg-cosmic-900 rounded-xl flex flex-col justify-between p-4 items-center border border-cosmic-500/30 shadow-inner">
-                                <div class="w-full h-full border border-cosmic-500/20 rounded-lg flex flex-col justify-between items-center py-6 bg-gradient-to-b from-cosmic-950 to-cosmic-900">
-                                    <span class="text-2xl text-cosmic-500">🌙</span>
-                                    <div class="w-14 h-14 rounded-full border-2 border-cosmic-500/30 flex items-center justify-center animate-pulse">
-                                        <div class="w-10 h-10 rounded-full bg-cosmic-500/10 border border-cosmic-300/20 flex items-center justify-center">
-                                            <span class="text-cosmic-300 text-xs">✨</span>
-                                        </div>
-                                    </div>
-                                    <span class="text-2xl text-cosmic-500">☀️</span>
+                            <div class="card-back absolute inset-0 rounded-2xl border border-aurora-gold/30 shadow-2xl shadow-cosmic-500/20 p-3 bg-cosmic-950">
+                                <div class="card-back-art w-full h-full rounded-xl border border-white/10 flex flex-col items-center justify-between py-6">
+                                    <span class="relative z-10 h-1.5 w-16 rounded-full bg-gradient-to-r from-transparent via-aurora-gold/70 to-transparent"></span>
+                                    <div class="constellation-mark relative z-10"></div>
+                                    <span class="relative z-10 h-1.5 w-16 rounded-full bg-gradient-to-r from-transparent via-aurora-cyan/70 to-transparent"></span>
                                 </div>
                             </div>
 
@@ -1708,12 +1792,12 @@ Please provide a brief, tailored reading (maximum 3 short paragraphs). Do not gi
 
             cardsToRender.forEach(card => {
                 const cardDiv = document.createElement('div');
-                cardDiv.className = "bg-cosmic-900 border border-cosmic-800 rounded-xl overflow-hidden shadow-md hover:border-cosmic-500/50 hover:shadow-lg hover:shadow-cosmic-500/5 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col justify-between";
+                cardDiv.className = "glass-panel rounded-2xl overflow-hidden hover:border-aurora-gold/40 hover:shadow-2xl hover:shadow-cosmic-500/10 hover:-translate-y-2 transition-all duration-300 cursor-pointer flex flex-col justify-between";
                 cardDiv.setAttribute('onclick', `openCardModal('${card.name.replace(/'/g, "\\'")}')`);
                 
                 cardDiv.innerHTML = `
-                    <div class="aspect-[14/24] overflow-hidden bg-cosmic-950 flex items-center justify-center">
-                        <img class="w-full h-full object-cover" src="${imageBaseUrl}${card.img}" alt="${card.name}" loading="lazy" onerror="this.src='https://placehold.co/150x260/1a1235/ffffff?text=${encodeURIComponent(card.name)}'">
+                    <div class="aspect-[14/24] overflow-hidden bg-cosmic-950 flex items-center justify-center p-2">
+                        <img class="w-full h-full object-cover rounded-xl border border-white/10" src="${imageBaseUrl}${card.img}" alt="${card.name}" loading="lazy" onerror="this.src='https://placehold.co/150x260/1a1235/ffffff?text=${encodeURIComponent(card.name)}'">
                     </div>
                     <div class="p-3 text-center border-t border-cosmic-800">
                         <h4 class="text-xs font-semibold tracking-wide truncate text-cosmic-100">${card.name}</h4>
@@ -1827,8 +1911,7 @@ Please provide a brief, tailored reading (maximum 3 short paragraphs). Do not gi
             }
         });
 
-        // Initialize App on Document Load
-        window.addEventListener('DOMContentLoaded', fetchTarotAssets);
+        // App initialization is handled by the primary DOMContentLoaded listener above.
 
     </script>
 </body>
