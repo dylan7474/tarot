@@ -1079,10 +1079,11 @@
         }
 
         // Dynamic Source URLs config
+        const SERVER_JSON_URL = '/assets/tarot-images.json';
         const LOCAL_JSON_URL = './tarot-images.json';
         const GITHUB_JSON_URL = 'https://raw.githubusercontent.com/metabismuth/tarot-json/master/tarot-images.json';
         
-        let imageBaseUrl = './cards/'; // Defaults to local
+        let imageBaseUrl = '/assets/cards/'; // Defaults to server-owned cached assets
 
         // Tone Synth Sound Engine setup
         let synth;
@@ -1143,40 +1144,58 @@
             const statusText = document.getElementById('status-text');
             const statusDot = document.getElementById('status-dot');
 
-            // Attempt 1: Fetch Local Repository JSON
+            // Attempt 1: Fetch server-owned cached assets. The Node server mirrors these from GitHub once.
             try {
-                const localResponse = await fetch(LOCAL_JSON_URL);
-                if (!localResponse.ok) throw new Error("Local assets missing");
-                
-                const data = await localResponse.json();
+                const serverResponse = await fetch(SERVER_JSON_URL);
+                if (!serverResponse.ok) throw new Error("Server asset cache unavailable");
+
+                const data = await serverResponse.json();
                 deck = data.cards;
-                imageBaseUrl = './cards/'; // Set path to local directory
-                
-                statusText.innerText = "Active Connection: Local Repo Assets Loaded successfully.";
+                imageBaseUrl = '/assets/cards/';
+
+                statusText.innerText = "Active Connection: Server asset cache loaded successfully.";
                 statusDot.className = "inline-block w-2.5 h-2.5 rounded-full bg-emerald-500";
-                console.log("Success: Loaded local files.");
-            } 
-            // Attempt 2: Fallback to official GitHub Repo online CDN
-            catch (localError) {
-                console.warn("Local assets not detected or running without local server. Falling back to Github online repository...", localError);
-                statusText.innerText = "Local repository not detected. Pulling assets from GitHub Repo...";
+                console.log("Success: Loaded cached server assets.");
+            }
+            // Attempt 2: Fetch local repository files when opened directly or served statically.
+            catch (serverError) {
+                console.warn("Server asset cache unavailable. Trying local repository assets...", serverError);
+                statusText.innerText = "Server cache unavailable. Seeking local repository assets...";
                 statusDot.className = "inline-block w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse";
 
                 try {
-                    const githubResponse = await fetch(GITHUB_JSON_URL);
-                    if (!githubResponse.ok) throw new Error("GitHub assets unreachable");
-                    
-                    const data = await githubResponse.json();
+                    const localResponse = await fetch(LOCAL_JSON_URL);
+                    if (!localResponse.ok) throw new Error("Local assets missing");
+
+                    const data = await localResponse.json();
                     deck = data.cards;
-                    imageBaseUrl = 'https://raw.githubusercontent.com/metabismuth/tarot-json/master/cards/';
-                    
-                    statusText.innerText = "Fallback Active: Connected & loaded directly from GitHub CDN.";
+                    imageBaseUrl = './cards/';
+
+                    statusText.innerText = "Active Connection: Local Repo Assets loaded successfully.";
                     statusDot.className = "inline-block w-2.5 h-2.5 rounded-full bg-emerald-500";
-                    console.log("Success: Loaded GitHub remote files.");
-                } catch (remoteError) {
-                    console.error("Critical: Could not load local or remote tarot data.", remoteError);
-                    statusText.innerText = "Critical Error: Offline & no local assets found.";
-                    statusDot.className = "inline-block w-2.5 h-2.5 rounded-full bg-red-500";
+                    console.log("Success: Loaded local files.");
+                }
+                // Attempt 3: Fallback to official GitHub Repo online CDN.
+                catch (localError) {
+                    console.warn("Local assets not detected. Falling back to Github online repository...", localError);
+                    statusText.innerText = "Local assets not detected. Pulling assets from GitHub Repo...";
+
+                    try {
+                        const githubResponse = await fetch(GITHUB_JSON_URL);
+                        if (!githubResponse.ok) throw new Error("GitHub assets unreachable");
+
+                        const data = await githubResponse.json();
+                        deck = data.cards;
+                        imageBaseUrl = 'https://raw.githubusercontent.com/metabismuth/tarot-json/master/cards/';
+
+                        statusText.innerText = "Fallback Active: Connected & loaded directly from GitHub CDN.";
+                        statusDot.className = "inline-block w-2.5 h-2.5 rounded-full bg-emerald-500";
+                        console.log("Success: Loaded GitHub remote files.");
+                    } catch (remoteError) {
+                        console.error("Critical: Could not load cached, local, or remote tarot data.", remoteError);
+                        statusText.innerText = "Critical Error: Offline & no tarot assets found.";
+                        statusDot.className = "inline-block w-2.5 h-2.5 rounded-full bg-red-500";
+                    }
                 }
             }
 
