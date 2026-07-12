@@ -153,9 +153,14 @@
 
                 <!-- Control Station -->
                 <div class="flex flex-col items-center gap-4 z-10">
-                    <button id="deal-button" class="bg-gradient-to-r from-cosmic-500 to-cosmic-300 hover:scale-105 active:scale-95 text-white font-serif font-semibold tracking-wider text-lg px-8 py-4 rounded-xl shadow-lg shadow-cosmic-500/30 transition-all duration-300 cursor-pointer" onclick="dealSpread()">
-                        SHUFFLE & DRAW SPHERE
-                    </button>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <button id="deal-button" class="bg-gradient-to-r from-cosmic-500 to-cosmic-300 hover:scale-105 active:scale-95 text-white font-serif font-semibold tracking-wider text-lg px-8 py-4 rounded-xl shadow-lg shadow-cosmic-500/30 transition-all duration-300 cursor-pointer" onclick="dealSpread()">
+                            SHUFFLE & DRAW SPHERE
+                        </button>
+                        <button id="reset-button" class="hidden bg-cosmic-900 hover:bg-cosmic-800 border border-cosmic-700 text-cosmic-100 font-serif font-semibold tracking-wider text-lg px-8 py-4 rounded-xl shadow-md hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer" onclick="resetReading()">
+                            RESET & NEW READING
+                        </button>
+                    </div>
                     <p id="board-instruction" class="text-xs text-cosmic-300 font-mono tracking-widest uppercase">Click to draw your destiny</p>
                 </div>
                 
@@ -741,6 +746,12 @@
             document.getElementById('ai-error').classList.add('hidden');
             drawnCards = [];
 
+            // Reset buttons
+            const dealBtn = document.getElementById('deal-button');
+            const resetBtn = document.getElementById('reset-button');
+            if (dealBtn) dealBtn.classList.remove('hidden', 'opacity-50', 'pointer-events-none');
+            if (resetBtn) resetBtn.classList.add('hidden');
+
             const layoutConfig = SPREADS[currentSpread];
             
             layoutConfig.forEach((slot, index) => {
@@ -835,7 +846,20 @@
             });
 
             document.getElementById('board-instruction').innerText = "Click cards to reveal their prophecy";
-            document.getElementById('deal-button').classList.add('opacity-50', 'pointer-events-none');
+            document.getElementById('deal-button').classList.add('hidden');
+            document.getElementById('reset-button').classList.remove('hidden');
+        }
+
+        // Reset the active board for consecutive readings without requiring refresh
+        function resetReading() {
+            // Clear current input question
+            document.getElementById('oracle-question').value = '';
+
+            // Clean layout states
+            setupSpreadBoard();
+            
+            // Play resetting chime
+            playChime("C4");
         }
 
         // Individual card flip reveal
