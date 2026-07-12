@@ -178,6 +178,61 @@
                 0px 6px 0px rgba(92, 51, 166, 0.2),
                 0px 18px 35px rgba(0, 0, 0, 0.55);
         }
+
+        .manual-altar-stage {
+            background:
+                radial-gradient(circle at 50% 42%, rgba(247, 215, 123, 0.12), transparent 18rem),
+                radial-gradient(circle at 20% 25%, rgba(125, 211, 252, 0.10), transparent 18rem),
+                radial-gradient(circle at 80% 25%, rgba(245, 154, 194, 0.10), transparent 18rem),
+                linear-gradient(145deg, rgba(12, 7, 33, 0.88), rgba(6, 2, 15, 0.68));
+            box-shadow: inset 0 0 80px rgba(157, 78, 223, 0.10), 0 26px 90px rgba(0,0,0,0.32);
+        }
+
+        .manual-pile {
+            width: clamp(7.75rem, 15vw, 10.5rem);
+            height: clamp(12rem, 24vw, 16.5rem);
+            position: relative;
+            isolation: isolate;
+        }
+
+        .manual-pile::before,
+        .manual-pile::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 1.15rem;
+            border: 1px solid rgba(247, 215, 123, 0.18);
+            background: linear-gradient(160deg, rgba(35, 21, 87, 0.8), rgba(6, 2, 15, 0.92));
+            z-index: -1;
+        }
+
+        .manual-pile::before { transform: translate(8px, 8px) rotate(1.5deg); }
+        .manual-pile::after { transform: translate(15px, 15px) rotate(3deg); opacity: 0.72; }
+
+        .manual-pile-empty::before,
+        .manual-pile-empty::after { display: none; }
+
+        .manual-pile-glow {
+            box-shadow: 0 0 0 1px rgba(247, 215, 123, 0.24), 0 28px 50px rgba(0,0,0,0.45), 0 0 42px rgba(157,78,223,0.18);
+        }
+
+        .manual-action-button {
+            min-width: 10rem;
+            border: 1px solid rgba(226, 212, 247, 0.14);
+            background: linear-gradient(145deg, rgba(35,21,87,0.92), rgba(12,7,33,0.92));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 26px rgba(0,0,0,0.22);
+        }
+
+        .manual-action-button:hover {
+            transform: translateY(-1px);
+            border-color: rgba(247, 215, 123, 0.38);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 16px 34px rgba(92,51,166,0.25);
+        }
+
+        .ribbon-card {
+            box-shadow: 0 14px 26px rgba(0,0,0,0.32);
+        }
+
     </style>
 </head>
 <body class="text-gray-100 min-h-screen font-sans flex flex-col justify-between overflow-x-hidden">
@@ -262,78 +317,80 @@
                     <!-- Dynamic Spread Slots Go Here -->
                 </div>
 
-                <!-- ================= PHYSICAL DECK ALTER TABLE (MANUAL MODE ONLY) ================= -->
-                <div id="altar-table" class="hidden w-full max-w-2xl bg-cosmic-900/50 border border-cosmic-700/40 rounded-2xl p-6 mb-8 text-center space-y-6 relative z-10">
-                    <div class="border-b border-cosmic-700/30 pb-3 flex justify-between items-center px-4">
-                        <span class="text-xs font-mono tracking-widest text-cosmic-300 uppercase">The Altar: Hand-Shuffle Station</span>
-                        <span id="altar-status" class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">Deck Reset: 78 Cards Stacked</span>
+                <!-- ================= PHYSICAL DECK ALTAR TABLE (MANUAL MODE ONLY) ================= -->
+                <div id="altar-table" class="hidden w-full max-w-6xl manual-altar-stage border border-cosmic-700/40 rounded-[2rem] p-5 md:p-8 mb-8 text-center space-y-6 relative z-10 overflow-hidden">
+                    <div class="absolute inset-x-8 top-24 h-px bg-gradient-to-r from-transparent via-aurora-gold/30 to-transparent pointer-events-none"></div>
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-cosmic-700/30 pb-5 relative z-10">
+                        <div class="text-left space-y-1">
+                            <span class="text-[10px] font-mono tracking-[0.35em] text-aurora-gold uppercase">The Altar</span>
+                            <h3 class="font-serif text-2xl md:text-3xl text-cosmic-100">Physical Deck Simulator</h3>
+                            <p class="text-xs text-cosmic-300 max-w-2xl">A larger, cleaner working table for every hand operation: choose a packet, cut the deck, invert a pile, then rejoin or riffle merge.</p>
+                        </div>
+                        <span id="altar-status" class="self-start lg:self-center text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 whitespace-nowrap">Deck Reset: 78 Cards Stacked</span>
                     </div>
 
                     <!-- Visual Pile Displays -->
-                    <div class="flex justify-center items-center gap-12 py-4 h-48">
-                        
+                    <div class="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-6 md:gap-10 py-4 md:py-8 min-h-[24rem] relative z-10">
                         <!-- Left / Main Pile -->
-                        <div id="pile-left-container" class="flex flex-col items-center gap-2">
-                            <div id="pile-left" class="w-24 h-40 bg-gradient-to-b from-cosmic-950 to-cosmic-900 rounded-xl border border-cosmic-500/40 deck-stack-3d cursor-pointer flex items-center justify-center transition-all duration-300 hover:scale-105" onclick="triggerHandShuffleTip()">
-                                <div class="text-center font-serif text-[10px] text-cosmic-300 p-2 flex flex-col items-center justify-center gap-2">
-                                    <span>🌙</span>
-                                    <span id="pile-left-label" class="text-xs font-bold text-white">Left Pile</span>
-                                    <span id="pile-left-count" class="text-[9px]">78 Cards</span>
+                        <div id="pile-left-container" class="flex flex-col items-center gap-4">
+                            <button id="pile-left" type="button" class="manual-pile manual-pile-glow bg-gradient-to-b from-cosmic-950 to-cosmic-900 rounded-[1.15rem] border border-cosmic-500/50 deck-stack-3d cursor-pointer flex items-center justify-center transition-all duration-300 hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-aurora-gold/60" onclick="triggerHandShuffleTip()" aria-label="Main pile. Click to start overhand shuffle.">
+                                <div class="card-back-art absolute inset-3 rounded-xl border border-white/10 opacity-90"></div>
+                                <div class="relative z-10 text-center font-serif text-[10px] text-cosmic-300 p-3 flex flex-col items-center justify-center gap-3">
+                                    <span class="constellation-mark scale-75"></span>
+                                    <span id="pile-left-label" class="text-base font-bold text-white">Main Pile</span>
+                                    <span id="pile-left-count" class="text-[11px] font-mono tracking-widest text-aurora-gold">78 Cards</span>
                                 </div>
-                            </div>
-                            <button id="btn-invert-left" class="hidden text-[10px] font-mono tracking-widest uppercase bg-cosmic-800 hover:bg-cosmic-700 border border-cosmic-700 px-2 py-1 rounded text-cosmic-300 hover:text-white transition" onclick="invertPile('left')">🔄 Invert Pile</button>
+                            </button>
+                            <button id="btn-invert-left" class="hidden manual-action-button text-[10px] font-mono tracking-widest uppercase px-4 py-2 rounded-xl text-cosmic-100 transition" onclick="invertPile('left')">↻ Invert Left Pile</button>
                         </div>
 
                         <!-- Split Action Icon / Center Slider -->
-                        <div id="altar-divider" class="flex flex-col items-center gap-3">
-                            <span id="altar-arrow" class="text-3xl text-cosmic-700">🔮</span>
-                            <div id="cut-slider-container" class="hidden flex flex-col items-center gap-1">
-                                <label for="cut-slider" class="text-[9px] font-mono uppercase text-cosmic-300 tracking-wider">Cut Depth: <span id="cut-val">50%</span></label>
-                                <input type="range" id="cut-slider" min="10" max="90" value="50" class="w-24 accent-cosmic-500 bg-cosmic-950 h-1.5 rounded-lg appearance-none cursor-pointer" oninput="updateCutSliderValue()">
+                        <div id="altar-divider" class="flex flex-col items-center justify-center gap-4 px-2">
+                            <div class="w-20 h-20 rounded-full border border-aurora-gold/30 bg-cosmic-950/70 flex items-center justify-center shadow-[0_0_45px_rgba(247,215,123,0.12)]">
+                                <span id="altar-arrow" class="text-4xl text-cosmic-300">✦</span>
+                            </div>
+                            <div id="cut-slider-container" class="hidden w-56 flex flex-col items-center gap-2 bg-cosmic-950/70 border border-cosmic-800 rounded-2xl p-4">
+                                <label for="cut-slider" class="text-[9px] font-mono uppercase text-cosmic-300 tracking-wider">Cut Depth: <span id="cut-val" class="text-aurora-gold">50%</span></label>
+                                <input type="range" id="cut-slider" min="10" max="90" value="50" class="w-full accent-cosmic-500 bg-cosmic-950 h-1.5 rounded-lg appearance-none cursor-pointer" oninput="updateCutSliderValue()">
                             </div>
                         </div>
 
                         <!-- Right Pile -->
-                        <div id="pile-right-container" class="flex flex-col items-center gap-2 opacity-50">
-                            <div id="pile-right" class="w-24 h-40 bg-gradient-to-b from-cosmic-950 to-cosmic-900 rounded-xl border border-dashed border-cosmic-700 flex items-center justify-center transition-all duration-300">
-                                <div class="text-center font-serif text-[10px] text-cosmic-300 p-2 flex flex-col items-center justify-center gap-2">
-                                    <span>☀️</span>
-                                    <span id="pile-right-label" class="font-bold text-slate-500">Empty</span>
-                                    <span id="pile-right-count" class="text-[9px]">0 Cards</span>
+                        <div id="pile-right-container" class="flex flex-col items-center gap-4 opacity-50">
+                            <div id="pile-right" class="manual-pile manual-pile-empty bg-cosmic-950/35 rounded-[1.15rem] border border-dashed border-cosmic-700 flex items-center justify-center transition-all duration-300">
+                                <div class="text-center font-serif text-[10px] text-cosmic-300 p-3 flex flex-col items-center justify-center gap-3">
+                                    <span class="text-4xl opacity-60">☉</span>
+                                    <span id="pile-right-label" class="text-base font-bold text-slate-500">Empty</span>
+                                    <span id="pile-right-count" class="text-[11px] font-mono tracking-widest">0 Cards</span>
                                 </div>
                             </div>
-                            <button id="btn-invert-right" class="hidden text-[10px] font-mono tracking-widest uppercase bg-cosmic-800 hover:bg-cosmic-700 border border-cosmic-700 px-2 py-1 rounded text-cosmic-300 hover:text-white transition" onclick="invertPile('right')">🔄 Invert Pile</button>
+                            <button id="btn-invert-right" class="hidden manual-action-button text-[10px] font-mono tracking-widest uppercase px-4 py-2 rounded-xl text-cosmic-100 transition" onclick="invertPile('right')">↻ Invert Right Pile</button>
                         </div>
                     </div>
 
                     <!-- Tactical Altar Controls -->
-                    <div id="altar-controls" class="flex flex-wrap justify-center gap-3 bg-cosmic-950/40 p-4 rounded-xl border border-cosmic-800/60">
-                        <button id="btn-overhand" class="px-4 py-2 rounded-lg text-xs font-mono font-bold bg-cosmic-800 border border-cosmic-700 hover:bg-cosmic-700 text-cosmic-100 transition" onclick="triggerOverhandShuffle()">
-                            👋 OVERHAND SHUFFLE
-                        </button>
-                        <button id="btn-cut-deck" class="px-4 py-2 rounded-lg text-xs font-mono font-bold bg-cosmic-800 border border-cosmic-700 hover:bg-cosmic-700 text-cosmic-100 transition" onclick="triggerCutDeck()">
-                            ✂️ CUT DECK IN TWO
-                        </button>
-                        <button id="btn-rejoin-cut" class="hidden px-4 py-2 rounded-lg text-xs font-mono font-bold bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-300 transition" onclick="triggerRejoinCut()">
-                            🔗 COMPLETE THE CUT
-                        </button>
-                        <button id="btn-riffle-merge" class="hidden px-4 py-2 rounded-lg text-xs font-mono font-bold bg-gradient-to-r from-cosmic-500 to-indigo-600 border border-cosmic-300/40 hover:from-cosmic-600 text-white transition" onclick="triggerRiffleShuffle()">
-                            ⚡ RIFFLE SHUFFLE MERGE
-                        </button>
+                    <div id="altar-controls" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-cosmic-950/45 p-4 rounded-2xl border border-cosmic-800/60 relative z-10">
+                        <button id="btn-overhand" class="manual-action-button px-4 py-3 rounded-xl text-xs font-mono font-bold text-cosmic-100 transition" onclick="triggerOverhandShuffle()">👋 Overhand Packet</button>
+                        <button id="btn-cut-deck" class="manual-action-button px-4 py-3 rounded-xl text-xs font-mono font-bold text-cosmic-100 transition" onclick="triggerCutDeck()">✂️ Cut Deck</button>
+                        <button id="btn-rejoin-cut" class="hidden px-4 py-3 rounded-xl text-xs font-mono font-bold bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 text-yellow-300 transition" onclick="triggerRejoinCut()">🔗 Complete Cut</button>
+                        <button id="btn-riffle-merge" class="hidden px-4 py-3 rounded-xl text-xs font-mono font-bold bg-gradient-to-r from-cosmic-500 to-indigo-600 border border-cosmic-300/40 hover:from-cosmic-600 text-white transition" onclick="triggerRiffleShuffle()">⚡ Riffle Merge</button>
                     </div>
 
-                    <p class="text-[10px] text-cosmic-300 font-mono tracking-widest uppercase animate-pulse" id="altar-instruction">
-                        Shuffle using Overhand, or Cut & Invert to set the alignment before dealing!
+                    <p class="text-[11px] text-cosmic-300 font-mono tracking-widest uppercase" id="altar-instruction">
+                        Shuffle using Overhand, or Cut & Invert to set the alignment before dealing.
                     </p>
                 </div>
 
                 <!-- ================= THE PHYSICAL DECK RIBBON SPREAD ================= -->
-                <div id="ribbon-spread-section" class="hidden w-full max-w-4xl bg-cosmic-900/30 border border-cosmic-800/60 rounded-2xl p-6 mb-8 text-center space-y-4">
-                    <span id="ribbon-spread-title" class="text-xs font-mono tracking-widest text-cosmic-300 uppercase">The Ribbon Spread: Choose Your Cards</span>
-                    <div id="ribbon-spread-scroll" class="relative w-full h-72 sm:h-80 overflow-hidden flex justify-center mt-4">
+                <div id="ribbon-spread-section" class="hidden w-full max-w-6xl bg-cosmic-900/35 border border-cosmic-800/60 rounded-[2rem] p-5 md:p-8 mb-8 text-center space-y-4 shadow-2xl shadow-black/20">
+                    <div class="space-y-1">
+                        <span id="ribbon-spread-title" class="text-xs font-mono tracking-[0.3em] text-aurora-gold uppercase">The Ribbon Spread: Choose Your Cards</span>
+                        <p class="text-xs text-cosmic-300">The same card field powers packet selection, cut points, and final dealing so every action feels consistent.</p>
+                    </div>
+                    <div id="ribbon-spread-scroll" class="relative w-full h-[22rem] sm:h-[28rem] overflow-hidden flex justify-center mt-4 rounded-3xl bg-cosmic-950/30 border border-cosmic-800/50">
                         <!-- Dynamic face-down fanned cards loaded here in a gorgeous crescent arch -->
                     </div>
-                    <p id="ribbon-spread-instruction" class="text-[10px] text-cosmic-300 font-mono tracking-widest uppercase">Click any card from the ribbon spread above to deal it to the next empty slot!</p>
+                    <p id="ribbon-spread-instruction" class="text-[10px] text-cosmic-300 font-mono tracking-widest uppercase">Click any card from the ribbon spread above to deal it to the next empty slot.</p>
                 </div>
 
                 <!-- Control Station -->
@@ -1019,14 +1076,17 @@
             ribbonScroll.innerHTML = '';
 
             const total = physicalDeck.length;
-            const radius = window.innerWidth < 640 ? 130 : 185; // Responsive radius alignment
-            const startAngle = -75;
-            const endAngle = 75;
+            const radius = window.innerWidth < 640 ? 165 : 245; // Responsive radius alignment
+            const startAngle = -68;
+            const endAngle = 68;
 
             physicalDeck.forEach((cardState, index) => {
                 const cardEl = document.createElement('div');
                 // Absolute placement centered at bottom, sweeping outward radially via inline transitions
-                cardEl.className = "absolute bottom-4 left-1/2 -ml-6 sm:-ml-8 w-12 h-20 sm:w-16 sm:h-28 cursor-pointer rounded-lg border border-cosmic-500/30 bg-gradient-to-b from-cosmic-950 to-cosmic-900 hover:border-cosmic-300 hover:shadow-lg hover:shadow-cosmic-500/40 hover:z-50 transition-all duration-300 origin-bottom transform-gpu";
+                cardEl.className = "ribbon-card absolute bottom-6 left-1/2 -ml-7 sm:-ml-10 w-14 h-24 sm:w-20 sm:h-32 cursor-pointer rounded-xl border border-cosmic-500/30 bg-gradient-to-b from-cosmic-950 to-cosmic-900 hover:border-aurora-gold hover:shadow-lg hover:shadow-cosmic-500/40 hover:z-50 transition-all duration-300 origin-bottom transform-gpu focus:outline-none focus:ring-2 focus:ring-aurora-gold/60";
+                cardEl.setAttribute('role', 'button');
+                cardEl.setAttribute('tabindex', '0');
+                cardEl.setAttribute('aria-label', `Select card ${index + 1} of ${total}`);
                 
                 // Distribute angles evenly across the crescent arc
                 const angle = startAngle + (index / (total - 1 || 1)) * (endAngle - startAngle);
@@ -1048,6 +1108,12 @@
                 `;
 
                 cardEl.addEventListener('click', () => handleRibbonCardClick(index));
+                cardEl.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleRibbonCardClick(index);
+                    }
+                });
                 ribbonScroll.appendChild(cardEl);
             });
         }
@@ -1137,7 +1203,7 @@
                 pRightCount.innerText = "0 Cards";
                 pRightLabel.innerText = "Empty";
                 pRightContainer.classList.add('opacity-50');
-                pRight.className = "w-24 h-40 bg-gradient-to-b from-cosmic-950 to-cosmic-900 rounded-xl border border-dashed border-cosmic-700 flex items-center justify-center transition-all duration-300";
+                pRight.className = "manual-pile manual-pile-empty bg-cosmic-950/35 rounded-[1.15rem] border border-dashed border-cosmic-700 flex items-center justify-center transition-all duration-300";
                 btnInvRight.classList.add('hidden');
 
                 slider.classList.add('hidden');
@@ -1172,7 +1238,7 @@
                 pRightCount.innerText = `${cutPiles.right.length} Cards`;
                 pRightLabel.innerText = "Right Pile";
                 pRightContainer.classList.remove('opacity-50');
-                pRight.className = "w-24 h-40 bg-gradient-to-b from-cosmic-950 to-cosmic-900 rounded-xl border border-cosmic-500/40 deck-stack-3d cursor-pointer flex items-center justify-center transition-all duration-300 hover:scale-105";
+                pRight.className = "manual-pile manual-pile-glow bg-gradient-to-b from-cosmic-950 to-cosmic-900 rounded-[1.15rem] border border-cosmic-500/50 deck-stack-3d flex items-center justify-center transition-all duration-300";
                 btnInvRight.classList.remove('hidden');
 
                 slider.classList.remove('hidden');
