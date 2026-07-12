@@ -262,15 +262,6 @@
                     <!-- Dynamic Spread Slots Go Here -->
                 </div>
 
-                <!-- ================= THE PHYSICAL DECK RIBBON SPREAD ================= -->
-                <div id="ribbon-spread-section" class="hidden w-full max-w-4xl bg-cosmic-900/30 border border-cosmic-800/60 rounded-2xl p-6 mb-8 text-center space-y-4">
-                    <span id="ribbon-spread-title" class="text-xs font-mono tracking-widest text-cosmic-300 uppercase">The Ribbon Spread: Choose Your Cards</span>
-                    <div id="ribbon-spread-scroll" class="relative w-full h-72 sm:h-80 overflow-hidden flex justify-center mt-4">
-                        <!-- Dynamic face-down fanned cards loaded here in a gorgeous crescent arch -->
-                    </div>
-                    <p id="ribbon-spread-instruction" class="text-[10px] text-cosmic-300 font-mono tracking-widest uppercase">Click any card from the ribbon spread above to deal it to the next empty slot!</p>
-                </div>
-
                 <!-- ================= PHYSICAL DECK ALTER TABLE (MANUAL MODE ONLY) ================= -->
                 <div id="altar-table" class="hidden w-full max-w-2xl bg-cosmic-900/50 border border-cosmic-700/40 rounded-2xl p-6 mb-8 text-center space-y-6 relative z-10">
                     <div class="border-b border-cosmic-700/30 pb-3 flex justify-between items-center px-4">
@@ -334,6 +325,15 @@
                     <p class="text-[10px] text-cosmic-300 font-mono tracking-widest uppercase animate-pulse" id="altar-instruction">
                         Shuffle using Overhand, or Cut & Invert to set the alignment before dealing!
                     </p>
+                </div>
+
+                <!-- ================= THE PHYSICAL DECK RIBBON SPREAD ================= -->
+                <div id="ribbon-spread-section" class="hidden w-full max-w-4xl bg-cosmic-900/30 border border-cosmic-800/60 rounded-2xl p-6 mb-8 text-center space-y-4">
+                    <span id="ribbon-spread-title" class="text-xs font-mono tracking-widest text-cosmic-300 uppercase">The Ribbon Spread: Choose Your Cards</span>
+                    <div id="ribbon-spread-scroll" class="relative w-full h-72 sm:h-80 overflow-hidden flex justify-center mt-4">
+                        <!-- Dynamic face-down fanned cards loaded here in a gorgeous crescent arch -->
+                    </div>
+                    <p id="ribbon-spread-instruction" class="text-[10px] text-cosmic-300 font-mono tracking-widest uppercase">Click any card from the ribbon spread above to deal it to the next empty slot!</p>
                 </div>
 
                 <!-- Control Station -->
@@ -586,6 +586,7 @@
         let physicalDeck = [];         // Active deck of 78 cards: array of { cardObj, isReversed: bool }
         let cutPiles = null;           // When cut: { left: [], right: [] }
         let manualActionMode = null;   // When set, ribbon clicks choose shuffle/cut points instead of drawing
+        let manualDeckPrepared = false; // Manual readings require a shuffle/cut action before card selection opens
 
         let aiProvider = 'gemini';
         let ollamaAddress = 'http://localhost:11434';
@@ -938,6 +939,7 @@
             });
             cutPiles = null;
             manualActionMode = null;
+            manualDeckPrepared = false;
             updateAltarView();
             renderRibbonSpread();
         }
@@ -963,7 +965,7 @@
                 
                 // When in manual simulator mode, disable instant automatic dealing
                 dealBtn.classList.add('hidden');
-                document.getElementById('board-instruction').innerText = "Manipulate the deck on the Altar below, then click cards on the ribbon spread to draw your cards!";
+                document.getElementById('board-instruction').innerText = "Begin with a shuffle or cut on the Altar; the selection ribbon opens after the deck is prepared.";
                 
                 initializePhysicalDeck();
                 setupSpreadBoard();
@@ -991,7 +993,9 @@
             const hasVacantSlots = SPREADS[currentSpread].some((_, idx) => drawnCards[idx] === undefined);
             
             // Render only in whole manual mode with space left on board
-            const shouldShowRibbon = shuffleMode === 'manual' && cutPiles === null && physicalDeck.length > 0 && (hasVacantSlots || manualActionMode !== null);
+            const shouldShowRibbon = shuffleMode === 'manual'
+                && physicalDeck.length > 0
+                && (manualActionMode !== null || (manualDeckPrepared && cutPiles === null && hasVacantSlots));
             if (shouldShowRibbon) {
                 ribbonSection.classList.remove('hidden');
             } else {
@@ -1145,7 +1149,7 @@
                 if (physicalDeck.length === 78) {
                     statusText.innerText = "Deck Reset: 78 Cards Stacked";
                     statusText.className = "text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20";
-                    instruction.innerText = "The deck is whole. Shuffle using Overhand or Cut & Invert to randomize orientation!";
+                    instruction.innerText = "Begin here: shuffle using Overhand, or Cut & Invert, before selecting cards from the ribbon.";
                 } else if (physicalDeck.length === 0) {
                     statusText.innerText = "Altar Cleared: All cards drawn";
                     statusText.className = "text-[10px] font-mono text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/20";
@@ -1153,7 +1157,9 @@
                 } else {
                     statusText.innerText = `Intact Stack: ${physicalDeck.length} Cards remaining`;
                     statusText.className = "text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-full border border-purple-500/20";
-                    instruction.innerText = "Choose cards directly from the ribbon spread fanned on the Altar above!";
+                    instruction.innerText = manualDeckPrepared
+                        ? "Now choose cards from the ribbon spread below the Altar."
+                        : "Shuffle or cut the deck first; the selection ribbon will open afterward.";
                 }
             } 
             // Cut State: Deck split in two halves
@@ -1201,6 +1207,7 @@
             const remainingDeck = physicalDeck.slice(packetEnd);
             physicalDeck = remainingDeck.concat(liftedPacket);
             manualActionMode = null;
+            manualDeckPrepared = true;
 
             const statusText = document.getElementById('altar-status');
             statusText.innerText = `Overhand packet moved: ${liftedPacket.length} Cards`;
@@ -1289,6 +1296,7 @@
             // Standard rejoinder placing top pile straight back on bottom
             physicalDeck = cutPiles.left.concat(cutPiles.right);
             cutPiles = null;
+            manualDeckPrepared = true;
             updateAltarView();
             renderRibbonSpread();
         }
@@ -1316,6 +1324,7 @@
 
             physicalDeck = merged;
             cutPiles = null;
+            manualDeckPrepared = true;
             updateAltarView();
             renderRibbonSpread();
         }
@@ -1472,7 +1481,9 @@
             });
             
             if (shuffleMode === 'manual') {
-                document.getElementById('board-instruction').innerText = "Manipulate the deck below, then click any card back in the ribbon spread to deal!";
+                document.getElementById('board-instruction').innerText = manualDeckPrepared
+                    ? "Select cards from the ribbon below the Altar to deal them into the spread."
+                    : "Begin with a shuffle or cut on the Altar; card selection comes next.";
                 updateAltarView();
                 renderRibbonSpread();
             } else {
