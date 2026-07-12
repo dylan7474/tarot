@@ -25,16 +25,32 @@ python3 -m http.server 8000
 
 Then visit `http://localhost:8000`.
 
+### Run with server-side persistence
+
+To make settings and the physical deck order perpetual across browsers and sessions, run the included Node.js server instead of a generic static server:
+
+```bash
+node server.js
+```
+
+Then visit `http://localhost:8000`. The app stores shared settings, AI provider configuration, Ollama model choices, and the current physical deck order in `data/server-state.json`. Set `PORT` to choose a different port, or `TAROT_DATA_DIR` to store the state file somewhere outside the repository:
+
+```bash
+PORT=3018 TAROT_DATA_DIR=/var/lib/cosmic-tarot node server.js
+```
+
+If the page is opened directly from disk or served without `server.js`, Cosmic Tarot automatically falls back to browser-local storage.
+
 ### Deploy with Docker
 
-Use the included deployment script to build a minimal Nginx image and run Cosmic Tarot in Docker. The script defaults to port `3018`, or you can pass a different port as the first argument.
+Use the included deployment script to build a minimal Node.js image and run Cosmic Tarot in Docker with server-side persistence enabled. The script defaults to port `3018`, or you can pass a different port as the first argument.
 
 ```bash
 ./deploy.sh
 ./deploy.sh 8080
 ```
 
-Then visit `http://localhost:3018` unless you selected a custom port.
+Then visit `http://localhost:3018` unless you selected a custom port. Docker deployments keep server-side settings and deck order in the `cosmic-tarot-data` Docker volume.
 
 ### Optional AI setup
 

@@ -32,25 +32,16 @@ cleanup() {
 trap cleanup EXIT
 
 cp "${SCRIPT_DIR}/index.html" "${BUILD_DIR}/index.html"
-
-cat > "${BUILD_DIR}/nginx.conf" <<NGINX_EOF
-server {
-  listen ${PORT_ARG};
-  server_name _;
-
-  root /usr/share/nginx/html;
-  index index.html;
-
-  location / {
-    try_files \$uri \$uri/ /index.html;
-  }
-}
-NGINX_EOF
+cp "${SCRIPT_DIR}/server.js" "${BUILD_DIR}/server.js"
 
 cat > "${BUILD_DIR}/Dockerfile" <<'DOCKER_EOF'
-FROM nginx:1.29-alpine
-COPY index.html /usr/share/nginx/html/index.html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+FROM node:24-alpine
+WORKDIR /app
+COPY index.html server.js ./
+RUN mkdir -p /data
+ENV TAROT_DATA_DIR=/data
+EXPOSE 8000
+CMD ["node", "server.js"]
 DOCKER_EOF
 
 echo "Building Docker image..."
@@ -62,7 +53,8 @@ docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
 echo "Starting container..."
 docker run -d \
   --name "${CONTAINER_NAME}" \
-  -p "${PORT_ARG}:${PORT_ARG}" \
+  -p "${PORT_ARG}:8000" \
+  -v "${CONTAINER_NAME}-data:/data" \
   --restart unless-stopped \
   "${IMAGE_NAME}" >/dev/null
 
