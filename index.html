@@ -349,7 +349,7 @@
                 <div class="pt-2 pb-1">
                     <label for="oracle-question" class="block text-[10px] font-mono tracking-widest text-cosmic-300 uppercase mb-2">Engrave Your Question Here</label>
                     <div class="relative max-w-lg mx-auto">
-                        <input type="text" id="oracle-question" placeholder="E.g., What career moves should I initiate over the next six months?" class="w-full bg-cosmic-950/70 border border-cosmic-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cosmic-300 focus:ring-1 focus:ring-cosmic-300 placeholder-cosmic-300/40 text-center transition-all duration-300">
+                        <input type="text" id="oracle-question" oninput="saveUserSetting('oracleQuestion', this.value)" placeholder="E.g., What career moves should I initiate over the next six months?" class="w-full bg-cosmic-950/70 border border-cosmic-700/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cosmic-300 focus:ring-1 focus:ring-cosmic-300 placeholder-cosmic-300/40 text-center transition-all duration-300">
                         <div class="absolute inset-0 rounded-xl pointer-events-none border border-cosmic-500/10 shadow-[0_0_15px_rgba(92,51,166,0.1)]"></div>
                     </div>
                 </div>
@@ -550,12 +550,12 @@
 
             <!-- Arcana / Suit Filters -->
             <div class="flex flex-wrap gap-2 pb-2 border-b border-cosmic-800">
-                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-500 text-white font-medium transition" onclick="filterCategory(this, 'all')">All Cards</button>
-                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition" onclick="filterCategory(this, 'major')">Major Arcana</button>
-                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition" onclick="filterCategory(this, 'wands')">Wands</button>
-                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition" onclick="filterCategory(this, 'cups')">Cups</button>
-                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition" onclick="filterCategory(this, 'swords')">Swords</button>
-                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition" onclick="filterCategory(this, 'pentacles')">Pentacles</button>
+                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-500 text-white font-medium transition" data-category="all" onclick="filterCategory(this, 'all')">All Cards</button>
+                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition" data-category="major" onclick="filterCategory(this, 'major')">Major Arcana</button>
+                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition" data-category="wands" onclick="filterCategory(this, 'wands')">Wands</button>
+                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition" data-category="cups" onclick="filterCategory(this, 'cups')">Cups</button>
+                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition" data-category="swords" onclick="filterCategory(this, 'swords')">Swords</button>
+                <button class="explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition" data-category="pentacles" onclick="filterCategory(this, 'pentacles')">Pentacles</button>
             </div>
 
             <!-- Main Explorer Card Grid -->
@@ -731,12 +731,70 @@
         let manualActionMode = null;   // When set, ribbon clicks choose shuffle/cut points instead of drawing
         let manualDeckPrepared = false; // Manual readings require a shuffle/cut action before card selection opens
         const PHYSICAL_DECK_STORAGE_KEY = 'cosmic_tarot_physical_deck_v1';
+        const USER_SETTINGS_STORAGE_KEY = 'cosmic_tarot_user_settings_v1';
 
         let aiProvider = 'gemini';
         let ollamaAddress = 'http://localhost:11434';
         let ollamaModel = '';
 
-        // Load stored API key if present on page load
+        function loadUserSettings() {
+            try {
+                return JSON.parse(localStorage.getItem(USER_SETTINGS_STORAGE_KEY)) || {};
+            } catch (error) {
+                console.warn('Stored user settings could not be restored. Resetting to defaults.', error);
+                localStorage.removeItem(USER_SETTINGS_STORAGE_KEY);
+                return {};
+            }
+        }
+
+        function saveUserSetting(key, value) {
+            const settings = loadUserSettings();
+            settings[key] = value;
+            localStorage.setItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+        }
+
+        function restoreUserSettings() {
+            const settings = loadUserSettings();
+            const validModes = ['readings', 'explorer'];
+            const validSpreads = Object.keys(SPREADS);
+            const validShuffleModes = ['automatic', 'manual'];
+            const validCategories = ['all', 'major', 'wands', 'cups', 'swords', 'pentacles'];
+
+            activeMode = validModes.includes(settings.activeMode) ? settings.activeMode : activeMode;
+            currentSpread = validSpreads.includes(settings.currentSpread) ? settings.currentSpread : currentSpread;
+            shuffleMode = validShuffleModes.includes(settings.shuffleMode) ? settings.shuffleMode : shuffleMode;
+            selectedCategory = validCategories.includes(settings.selectedCategory) ? settings.selectedCategory : selectedCategory;
+
+            const questionInput = document.getElementById('oracle-question');
+            if (questionInput && typeof settings.oracleQuestion === 'string') {
+                questionInput.value = settings.oracleQuestion;
+            }
+
+            const searchInput = document.getElementById('search-input');
+            if (searchInput && typeof settings.explorerSearch === 'string') {
+                searchInput.value = settings.explorerSearch;
+            }
+        }
+
+        function applyRestoredUserSettings() {
+            setShuffleMode(shuffleMode, false, false);
+            selectSpread(currentSpread, false, false);
+            switchMode(activeMode, false);
+            updateExplorerCategoryButtons();
+            filterDeck(false);
+        }
+
+        function updateExplorerCategoryButtons() {
+            const buttons = document.querySelectorAll('.explorer-filter-btn');
+            buttons.forEach(button => {
+                const buttonCategory = button.dataset.category;
+                button.className = buttonCategory === selectedCategory
+                    ? "explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-500 text-white font-medium transition"
+                    : "explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition";
+            });
+        }
+
+        // Load stored API key and user settings if present on page load
         window.addEventListener('DOMContentLoaded', () => {
             const storedKey = localStorage.getItem('gemini_api_key');
             if (storedKey) {
@@ -766,6 +824,7 @@
                 populateModelDropdown(JSON.parse(storedOllamaModels), ollamaModel);
             }
 
+            restoreUserSettings();
             switchProvider(aiProvider, false);
             updateApiStatusBadge();
             fetchTarotAssets();
@@ -1044,11 +1103,13 @@
             initializePhysicalDeck();
             setupSpreadBoard();
             renderExplorerGrid(deck);
+            applyRestoredUserSettings();
         }
 
         // 2. View Switching Setup
-        function switchMode(mode) {
+        function switchMode(mode, save = true) {
             activeMode = mode;
+            if (save) saveUserSetting('activeMode', mode);
             const readingsSection = document.getElementById('section-readings');
             const explorerSection = document.getElementById('section-explorer');
             const btnReadings = document.getElementById('btn-readings');
@@ -1147,15 +1208,16 @@
         }
 
         // Set alignment shuffle protocol (auto vs manual)
-        function setShuffleMode(mode) {
+        function setShuffleMode(mode, save = true, playSound = true) {
             shuffleMode = mode;
+            if (save) saveUserSetting('shuffleMode', mode);
             manualActionMode = null;
             const btnAuto = document.getElementById('btn-shuffle-auto');
             const btnManual = document.getElementById('btn-shuffle-manual');
             const altar = document.getElementById('altar-table');
             const dealBtn = document.getElementById('deal-button');
 
-            if (window.Tone && Tone.context.state !== 'running') {
+            if (playSound && window.Tone && Tone.context.state !== 'running') {
                 Tone.start();
                 initSound();
             }
@@ -1181,7 +1243,7 @@
                 
                 setupSpreadBoard();
             }
-            playChime("F4");
+            if (playSound) playChime("F4");
         }
 
         // Render 78 face down cards fanned out horizontally for manual choosing
@@ -1655,15 +1717,16 @@
             ]
         };
 
-        function selectSpread(type) {
+        function selectSpread(type, save = true, playSound = true) {
             currentSpread = type;
+            if (save) saveUserSetting('currentSpread', type);
             
             // Trigger audio feedback
-            if (window.Tone && Tone.context.state !== 'running') {
+            if (playSound && window.Tone && Tone.context.state !== 'running') {
                 Tone.start();
                 initSound();
             }
-            playChime("E4");
+            if (playSound) playChime("E4");
 
             // Update UI buttons
             const btnSingle = document.getElementById('btn-spread-single');
@@ -2121,19 +2184,17 @@ Please provide a brief, tailored reading (maximum 3 short paragraphs). Do not gi
 
         function filterCategory(btn, category) {
             selectedCategory = category;
+            saveUserSetting('selectedCategory', category);
             
-            // Toggle active style on category pills
-            const buttons = document.querySelectorAll('.explorer-filter-btn');
-            buttons.forEach(b => {
-                b.className = "explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-900 text-cosmic-300 border border-cosmic-700 hover:text-white transition";
-            });
-            btn.className = "explorer-filter-btn px-4 py-2 rounded-full text-sm bg-cosmic-500 text-white font-medium transition";
+            updateExplorerCategoryButtons();
 
             filterDeck();
         }
 
-        function filterDeck() {
-            const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
+        function filterDeck(save = true) {
+            const searchInput = document.getElementById('search-input');
+            const searchVal = searchInput.value.toLowerCase().trim();
+            if (save) saveUserSetting('explorerSearch', searchInput.value);
             
             let filtered = deck;
 
