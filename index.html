@@ -732,10 +732,94 @@
         let manualDeckPrepared = false; // Manual readings require a shuffle/cut action before card selection opens
         const PHYSICAL_DECK_STORAGE_KEY = 'cosmic_tarot_physical_deck_v1';
         const USER_SETTINGS_STORAGE_KEY = 'cosmic_tarot_user_settings_v1';
+        const SERVER_STATE_ENDPOINT = '/api/state';
+        let serverStorageAvailable = false;
+        let serverStorageStatus = 'local';
 
         let aiProvider = 'gemini';
         let ollamaAddress = 'http://localhost:11434';
         let ollamaModel = '';
+
+        async function fetchServerState() {
+            try {
+                const response = await fetch(SERVER_STATE_ENDPOINT, { headers: { 'Accept': 'application/json' } });
+                if (!response.ok) throw new Error(`Server storage unavailable: ${response.status}`);
+                const state = await response.json();
+                serverStorageAvailable = true;
+                serverStorageStatus = 'server';
+                hydrateLocalStorageFromServer(state);
+                return state;
+            } catch (error) {
+                serverStorageAvailable = false;
+                serverStorageStatus = 'local';
+                console.info('Server storage unavailable; using this browser as the local fallback.', error);
+                return null;
+            }
+        }
+
+        function hydrateLocalStorageFromServer(state) {
+            if (!state || typeof state !== 'object') return;
+            const storageMap = {
+                geminiApiKey: 'gemini_api_key',
+                aiProvider: 'ai_provider',
+                ollamaAddress: 'ollama_address',
+                ollamaModel: 'ollama_model',
+                ollamaModelsList: 'ollama_models_list',
+                userSettings: USER_SETTINGS_STORAGE_KEY,
+                physicalDeck: PHYSICAL_DECK_STORAGE_KEY
+            };
+
+            Object.entries(storageMap).forEach(([serverKey, localKey]) => {
+                if (state[serverKey] === undefined || state[serverKey] === null || state[serverKey] === '') return;
+                const value = typeof state[serverKey] === 'string' ? state[serverKey] : JSON.stringify(state[serverKey]);
+                localStorage.setItem(localKey, value);
+            });
+        }
+
+        function buildPersistentStateSnapshot() {
+            const parseStoredJson = (key, fallback) => {
+                try {
+                    return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+                } catch (error) {
+                    return fallback;
+                }
+            };
+
+            return {
+                geminiApiKey: localStorage.getItem('gemini_api_key') || '',
+                aiProvider: localStorage.getItem('ai_provider') || aiProvider,
+                ollamaAddress: localStorage.getItem('ollama_address') || ollamaAddress,
+                ollamaModel: localStorage.getItem('ollama_model') || ollamaModel,
+                ollamaModelsList: parseStoredJson('ollama_models_list', []),
+                userSettings: parseStoredJson(USER_SETTINGS_STORAGE_KEY, {}),
+                physicalDeck: parseStoredJson(PHYSICAL_DECK_STORAGE_KEY, null),
+                updatedAt: new Date().toISOString()
+            };
+        }
+
+        async function saveServerState() {
+            if (!serverStorageAvailable) return;
+
+            try {
+                const response = await fetch(SERVER_STATE_ENDPOINT, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(buildPersistentStateSnapshot())
+                });
+                if (!response.ok) throw new Error(`Server storage save failed: ${response.status}`);
+                serverStorageStatus = 'server';
+                updateApiStatusBadge();
+            } catch (error) {
+                serverStorageAvailable = false;
+                serverStorageStatus = 'local';
+                updateApiStatusBadge();
+                console.warn('Could not save to server storage; changes remain in this browser only.', error);
+            }
+        }
+
+        function persistStateToServer() {
+            saveServerState();
+        }
 
         function getStoredUserSettings() {
             const defaults = {
@@ -769,6 +853,7 @@
             };
 
             localStorage.setItem(USER_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+            persistStateToServer();
         }
 
         function restoreUserSettings() {
@@ -783,7 +868,8 @@
         }
 
         // Load stored API key if present on page load
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', async () => {
+            await fetchServerState();
             const storedKey = localStorage.getItem('gemini_api_key');
             if (storedKey) {
                 document.getElementById('api-key-input').value = storedKey;
@@ -850,6 +936,9 @@
                     headerBadge.className = "text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300";
                 }
             }
+
+            const storageLabel = serverStorageStatus === 'server' ? ' • Server sync' : ' • Local only';
+            if (badge && !badge.innerText.includes(storageLabel)) badge.innerText += storageLabel;
         }
 
         function switchProvider(provider, save = true) {
@@ -873,6 +962,7 @@
 
             if (save) {
                 localStorage.setItem('ai_provider', provider);
+                persistStateToServer();
                 updateApiStatusBadge();
             }
         }
@@ -903,6 +993,7 @@
             } else {
                 localStorage.removeItem('gemini_api_key');
             }
+            persistStateToServer();
             updateApiStatusBadge();
             toggleSettings();
         }
@@ -940,6 +1031,7 @@
                 }
 
                 localStorage.setItem('ollama_models_list', JSON.stringify(models));
+                persistStateToServer();
                 populateModelDropdown(models, ollamaModel);
                 
                 const badge = document.getElementById('api-status-badge');
@@ -981,6 +1073,7 @@
                 ollamaModel = model;
             }
 
+            persistStateToServer();
             updateApiStatusBadge();
             toggleSettings();
         }
@@ -1154,6 +1247,7 @@
                 manualDeckPrepared: manualDeckPrepared
             };
             localStorage.setItem(PHYSICAL_DECK_STORAGE_KEY, JSON.stringify(payload));
+            persistStateToServer();
         }
 
         function loadStoredPhysicalDeck() {
@@ -1182,6 +1276,7 @@
             } catch (error) {
                 console.warn('Stored physical deck could not be restored. Resetting to a fresh deck.', error);
                 localStorage.removeItem(PHYSICAL_DECK_STORAGE_KEY);
+                persistStateToServer();
                 return false;
             }
         }
