@@ -1,4 +1,5 @@
 const http = require('node:http');
+const https = require('node:https');
 const { promises: fs } = require('node:fs');
 const path = require('node:path');
 
@@ -6,6 +7,11 @@ const PORT = Number(process.env.PORT || 8000);
 const ROOT = __dirname;
 const DATA_DIR = process.env.TAROT_DATA_DIR || path.join(ROOT, 'data');
 const STATE_FILE = path.join(DATA_DIR, 'server-state.json');
+const ASSET_CACHE_DIR = process.env.TAROT_ASSET_CACHE_DIR || path.join(DATA_DIR, 'assets');
+const ASSET_CARDS_DIR = path.join(ASSET_CACHE_DIR, 'cards');
+const TAROT_JSON_FILE = path.join(ASSET_CACHE_DIR, 'tarot-images.json');
+const GITHUB_ASSET_BASE_URL = 'https://raw.githubusercontent.com/metabismuth/tarot-json/master';
+const ASSET_REFRESH_REQUESTED = process.argv.includes('--refresh-assets');
 
 const contentTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -29,6 +35,92 @@ const defaultState = {
   physicalDeck: null,
   updatedAt: null,
 };
+
+function fetchUrl(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, response => {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        response.resume();
+        reject(new Error(`Request for ${url} failed with status ${response.statusCode}`));
+        return;
+      }
+
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => resolve(Buffer.concat(chunks)));
+    }).on('error', reject);
+  });
+}
+
+async function pathExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function downloadAsset(relativePath, destinationPath) {
+  const safeRelativePath = relativePath.split('/').map(encodeURIComponent).join('/');
+  const payload = await fetchUrl(`${GITHUB_ASSET_BASE_URL}/${safeRelativePath}`);
+  await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+  await fs.writeFile(destinationPath, payload);
+}
+
+function getCardImageNames(tarotJson) {
+  return [...new Set((tarotJson.cards || [])
+    .map(card => card && card.img)
+    .filter(imageName => typeof imageName === 'string' && imageName.trim()))];
+}
+
+async function cachedAssetsAreComplete() {
+  if (!(await pathExists(TAROT_JSON_FILE))) return false;
+
+  const tarotJson = JSON.parse(await fs.readFile(TAROT_JSON_FILE, 'utf8'));
+  const imageNames = getCardImageNames(tarotJson);
+  if (!imageNames.length) return false;
+
+  const missingImageChecks = await Promise.all(imageNames.map(async imageName => ({
+    imageName,
+    exists: await pathExists(path.join(ASSET_CARDS_DIR, imageName)),
+  })));
+
+  return missingImageChecks.every(check => check.exists);
+}
+
+async function refreshTarotAssets() {
+  console.log(`Refreshing tarot assets from ${GITHUB_ASSET_BASE_URL}`);
+  const tarotJsonPayload = await fetchUrl(`${GITHUB_ASSET_BASE_URL}/tarot-images.json`);
+  const tarotJson = JSON.parse(tarotJsonPayload.toString('utf8'));
+  const imageNames = getCardImageNames(tarotJson);
+
+  await fs.mkdir(ASSET_CARDS_DIR, { recursive: true });
+  await fs.writeFile(TAROT_JSON_FILE, `${JSON.stringify(tarotJson, null, 2)}\n`, 'utf8');
+
+  for (const imageName of imageNames) {
+    await downloadAsset(`cards/${imageName}`, path.join(ASSET_CARDS_DIR, imageName));
+  }
+
+  console.log(`Cached ${imageNames.length} tarot card images in ${ASSET_CACHE_DIR}`);
+}
+
+let assetCachePromise;
+async function ensureTarotAssets() {
+  if (!assetCachePromise) {
+    assetCachePromise = (async () => {
+      if (ASSET_REFRESH_REQUESTED || !(await cachedAssetsAreComplete())) {
+        await refreshTarotAssets();
+      }
+    })().catch(error => {
+      assetCachePromise = null;
+      throw error;
+    });
+  }
+
+  return assetCachePromise;
+}
 
 async function readState() {
   try {
@@ -74,11 +166,12 @@ function sendError(response, statusCode, message) {
   sendJson(response, statusCode, { error: message });
 }
 
-async function serveStatic(request, response, pathname) {
+async function serveStatic(request, response, pathname, root = ROOT) {
   const safePath = pathname === '/' ? '/index.html' : decodeURIComponent(pathname);
-  const filePath = path.normalize(path.join(ROOT, safePath));
+  const filePath = path.normalize(path.join(root, safePath));
+  const rootWithSeparator = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
 
-  if (!filePath.startsWith(ROOT)) {
+  if (filePath !== root && !filePath.startsWith(rootWithSeparator)) {
     sendError(response, 403, 'Forbidden');
     return;
   }
@@ -88,7 +181,7 @@ async function serveStatic(request, response, pathname) {
     response.writeHead(200, {
       'Content-Type': contentTypes[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
     });
-    response.end(file);
+    response.end(request.method === 'HEAD' ? undefined : file);
   } catch (error) {
     if (error.code === 'ENOENT' || error.code === 'EISDIR') {
       sendError(response, 404, 'Not found');
@@ -120,6 +213,17 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname.startsWith('/assets/')) {
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        sendError(response, 405, 'Method not allowed');
+        return;
+      }
+
+      await ensureTarotAssets();
+      await serveStatic(request, response, url.pathname.replace(/^\/assets/, '') || '/', ASSET_CACHE_DIR);
+      return;
+    }
+
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       sendError(response, 405, 'Method not allowed');
       return;
@@ -132,7 +236,25 @@ const server = http.createServer(async (request, response) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Cosmic Tarot server listening at http://localhost:${PORT}`);
-  console.log(`Persistent state file: ${STATE_FILE}`);
+async function start() {
+  if (ASSET_REFRESH_REQUESTED) {
+    await refreshTarotAssets();
+    console.log('Manual tarot asset refresh completed.');
+    return;
+  }
+
+  ensureTarotAssets().catch(error => {
+    console.error('Tarot asset cache could not be prepared at startup. The server will retry on the next /assets request.', error);
+  });
+
+  server.listen(PORT, () => {
+    console.log(`Cosmic Tarot server listening at http://localhost:${PORT}`);
+    console.log(`Persistent state file: ${STATE_FILE}`);
+    console.log(`Tarot asset cache directory: ${ASSET_CACHE_DIR}`);
+  });
+}
+
+start().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
 });
