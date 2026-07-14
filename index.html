@@ -1142,6 +1142,58 @@
             }
         }
 
+
+        function sentenceFromList(items, fallback) {
+            const values = Array.isArray(items) ? items.map(item => String(item).trim()).filter(Boolean) : [];
+            if (!values.length) return fallback;
+            if (values.length === 1) return values[0];
+            return `${values.slice(0, -1).join(', ')} and ${values[values.length - 1]}`;
+        }
+
+        function generatedCardMeanings(card) {
+            const keywords = Array.isArray(card.keywords) ? card.keywords.filter(Boolean) : [];
+            const themes = sentenceFromList(keywords.slice(0, 4), card.name || 'this card');
+            const cardLabel = card.name || 'This card';
+            const suitContext = card.suit ? ` within the realm of ${card.suit}` : '';
+
+            return {
+                light: [
+                    `${cardLabel} invites ${themes}${suitContext}, showing where this energy can nourish growth, clarity, and aligned action.`,
+                    `In its upright light, this card asks you to trust the constructive expression of ${themes} and let it guide the next step.`
+                ],
+                shadow: [
+                    `${cardLabel} reversed points to blocked or overextended ${themes}${suitContext}, revealing what needs care, boundaries, or release.`,
+                    `In shadow, this card asks you to notice where ${themes} may be distorted by fear, delay, avoidance, or imbalance.`
+                ]
+            };
+        }
+
+        function normalizeMeaningList(value) {
+            if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean);
+            if (typeof value === 'string' && value.trim()) return [value.trim()];
+            return [];
+        }
+
+        function enrichCardMeanings(card) {
+            const generated = generatedCardMeanings(card);
+            const meanings = card && typeof card.meanings === 'object' && card.meanings ? card.meanings : {};
+            const light = normalizeMeaningList(meanings.light);
+            const shadow = normalizeMeaningList(meanings.shadow);
+
+            return {
+                ...card,
+                meanings: {
+                    ...meanings,
+                    light: light.length ? light : generated.light,
+                    shadow: shadow.length ? shadow : generated.shadow
+                }
+            };
+        }
+
+        function loadDeckFromTarotData(data) {
+            deck = Array.isArray(data.cards) ? data.cards.map(enrichCardMeanings) : [];
+        }
+
         // 1. Core Asset Fallback System Initialization
         async function fetchTarotAssets() {
             const statusText = document.getElementById('status-text');
@@ -1154,7 +1206,7 @@
                 if (!serverResponse.ok) throw new Error("Server asset cache unavailable");
 
                 const data = await serverResponse.json();
-                deck = data.cards;
+                loadDeckFromTarotData(data);
                 imageBaseUrl = '/assets/cards/';
 
                 statusText.innerText = "Active Connection: Server asset cache loaded successfully.";
@@ -1173,7 +1225,7 @@
                     if (!localResponse.ok) throw new Error("Local assets missing");
 
                     const data = await localResponse.json();
-                    deck = data.cards;
+                    loadDeckFromTarotData(data);
                     imageBaseUrl = './cards/';
 
                     statusText.innerText = "Active Connection: Local Repo Assets loaded successfully.";
@@ -1191,7 +1243,7 @@
                         if (!githubResponse.ok) throw new Error("GitHub assets unreachable");
 
                         const data = await githubResponse.json();
-                        deck = data.cards;
+                        loadDeckFromTarotData(data);
                         imageBaseUrl = 'https://raw.githubusercontent.com/metabismuth/tarot-json/master/cards/';
 
                         statusText.innerText = "Fallback Active: Connected & loaded directly from GitHub CDN.";
@@ -2154,12 +2206,12 @@
 
             drawnCards.forEach((draw, index) => {
                 const spreadSlot = SPREADS[currentSpread][index];
-                const card = draw.card;
+                const card = enrichCardMeanings(draw.card);
                 const meaningTitle = draw.isReversed ? "Reversed (Shadow Context)" : "Upright (Light Context)";
                 
                 const meanings = card.meanings || {};
                 const rawList = draw.isReversed ? meanings.shadow : meanings.light;
-                const interpretationList = Array.isArray(rawList) ? rawList : (typeof rawList === 'string' ? [rawList] : ["Prophecy details are currently unfolding. Meditate on the card imagery."]);
+                const interpretationList = normalizeMeaningList(rawList);
                 const keywordsList = card.keywords || [];
 
                 const cardBlock = document.createElement('div');
@@ -2437,8 +2489,9 @@ Please provide a brief, tailored reading (maximum 3 short paragraphs). Do not gi
 
         // 7. Modal Operations
         function openCardModal(cardName) {
-            const card = deck.find(c => c.name === cardName);
-            if (!card) return;
+            const storedCard = deck.find(c => c.name === cardName);
+            if (!storedCard) return;
+            const card = enrichCardMeanings(storedCard);
 
             // Load values to Modal
             document.getElementById('modal-card-img').src = `${imageBaseUrl}${card.img}`;
@@ -2453,15 +2506,13 @@ Please provide a brief, tailored reading (maximum 3 short paragraphs). Do not gi
             `).join('');
 
             // Set Upright meanings safely
-            const rawLight = (card.meanings && card.meanings.light) ? card.meanings.light : null;
-            const lightMeanings = Array.isArray(rawLight) ? rawLight : (typeof rawLight === 'string' ? [rawLight] : ["No light/upright meaning provided in dataset."]);
+            const lightMeanings = normalizeMeaningList(card.meanings && card.meanings.light);
             document.getElementById('modal-card-light').innerHTML = lightMeanings.map(m => `
                 <li>${m}</li>
             `).join('');
 
             // Set Reversed meanings safely
-            const rawShadow = (card.meanings && card.meanings.shadow) ? card.meanings.shadow : null;
-            const shadowMeanings = Array.isArray(rawShadow) ? rawShadow : (typeof rawShadow === 'string' ? [rawShadow] : ["No shadow/reversed meaning provided in dataset."]);
+            const shadowMeanings = normalizeMeaningList(card.meanings && card.meanings.shadow);
             document.getElementById('modal-card-shadow').innerHTML = shadowMeanings.map(m => `
                 <li>${m}</li>
             `).join('');

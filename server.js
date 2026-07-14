@@ -53,6 +53,63 @@ function fetchUrl(url) {
   });
 }
 
+
+function sentenceFromList(items, fallback) {
+  const values = Array.isArray(items)
+    ? items.map(item => String(item).trim()).filter(Boolean)
+    : [];
+  if (!values.length) return fallback;
+  if (values.length === 1) return values[0];
+  return `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`;
+}
+
+function generatedCardMeanings(card) {
+  const keywords = Array.isArray(card.keywords) ? card.keywords.filter(Boolean) : [];
+  const themes = sentenceFromList(keywords.slice(0, 4), card.name || 'this card');
+  const cardLabel = card.name || 'This card';
+  const suitContext = card.suit ? ` within the realm of ${card.suit}` : '';
+
+  return {
+    light: [
+      `${cardLabel} invites ${themes}${suitContext}, showing where this energy can nourish growth, clarity, and aligned action.`,
+      `In its upright light, this card asks you to trust the constructive expression of ${themes} and let it guide the next step.`,
+    ],
+    shadow: [
+      `${cardLabel} reversed points to blocked or overextended ${themes}${suitContext}, revealing what needs care, boundaries, or release.`,
+      `In shadow, this card asks you to notice where ${themes} may be distorted by fear, delay, avoidance, or imbalance.`,
+    ],
+  };
+}
+
+function normalizeMeaningList(value) {
+  if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean);
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  return [];
+}
+
+function enrichCardMeanings(card) {
+  const generated = generatedCardMeanings(card);
+  const meanings = card && typeof card.meanings === 'object' && card.meanings ? card.meanings : {};
+  const light = normalizeMeaningList(meanings.light);
+  const shadow = normalizeMeaningList(meanings.shadow);
+
+  return {
+    ...card,
+    meanings: {
+      ...meanings,
+      light: light.length ? light : generated.light,
+      shadow: shadow.length ? shadow : generated.shadow,
+    },
+  };
+}
+
+function enrichTarotJson(tarotJson) {
+  return {
+    ...tarotJson,
+    cards: Array.isArray(tarotJson.cards) ? tarotJson.cards.map(enrichCardMeanings) : [],
+  };
+}
+
 async function pathExists(filePath) {
   try {
     await fs.access(filePath);
@@ -79,7 +136,11 @@ function getCardImageNames(tarotJson) {
 async function cachedAssetsAreComplete() {
   if (!(await pathExists(TAROT_JSON_FILE))) return false;
 
-  const tarotJson = JSON.parse(await fs.readFile(TAROT_JSON_FILE, 'utf8'));
+  const rawTarotJson = JSON.parse(await fs.readFile(TAROT_JSON_FILE, 'utf8'));
+  const tarotJson = enrichTarotJson(rawTarotJson);
+  if (JSON.stringify(rawTarotJson.cards || []) !== JSON.stringify(tarotJson.cards)) {
+    await fs.writeFile(TAROT_JSON_FILE, `${JSON.stringify(tarotJson, null, 2)}\n`, 'utf8');
+  }
   const imageNames = getCardImageNames(tarotJson);
   if (!imageNames.length) return false;
 
@@ -94,7 +155,7 @@ async function cachedAssetsAreComplete() {
 async function refreshTarotAssets() {
   console.log(`Refreshing tarot assets from ${GITHUB_ASSET_BASE_URL}`);
   const tarotJsonPayload = await fetchUrl(`${GITHUB_ASSET_BASE_URL}/tarot-images.json`);
-  const tarotJson = JSON.parse(tarotJsonPayload.toString('utf8'));
+  const tarotJson = enrichTarotJson(JSON.parse(tarotJsonPayload.toString('utf8')));
   const imageNames = getCardImageNames(tarotJson);
 
   await fs.mkdir(ASSET_CARDS_DIR, { recursive: true });
