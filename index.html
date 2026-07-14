@@ -1339,10 +1339,27 @@
             });
         }
 
-        function saveReadingSessionState() {
+        function getStoredReadingSessionPayload() {
+            const stored = localStorage.getItem(READING_SESSION_STORAGE_KEY);
+            if (!stored) return null;
+
+            try {
+                return JSON.parse(stored);
+            } catch (error) {
+                console.warn('Stored reading session could not be parsed. Clearing interrupted reading state.', error);
+                localStorage.removeItem(READING_SESSION_STORAGE_KEY);
+                persistStateToServer();
+                return null;
+            }
+        }
+
+        function saveReadingSessionState(extraState = {}) {
             if (deck.length === 0) return;
             const hasDrawnCards = drawnCards.some(Boolean);
+            const existingPayload = getStoredReadingSessionPayload() || {};
             const payload = {
+                ...existingPayload,
+                ...extraState,
                 currentSpread,
                 shuffleMode,
                 drawnCards: serializeDrawnCards(),
@@ -1357,12 +1374,31 @@
             persistStateToServer();
         }
 
+        function saveAiReadingSessionState(text) {
+            const userQuestion = document.getElementById('oracle-question').value.trim();
+            saveReadingSessionState({
+                aiReadingText: text,
+                aiReadingQuestion: userQuestion || "A general guidance query on cosmic alignment and current life momentum.",
+                aiReadingProvider: aiProvider
+            });
+        }
+
+        function restoreAiReadingSessionState(payload) {
+            if (!payload || !payload.aiReadingText) return;
+            const outputBox = document.getElementById('ai-output-box');
+            const outputTarget = document.getElementById('ai-content-target');
+            const errorBanner = document.getElementById('ai-error');
+
+            outputTarget.innerHTML = parseCosmicMarkdown(payload.aiReadingText);
+            outputBox.classList.remove('hidden');
+            errorBanner.classList.add('hidden');
+        }
+
         function restoreReadingSessionState() {
-            const stored = localStorage.getItem(READING_SESSION_STORAGE_KEY);
-            if (!stored) return false;
+            const payload = getStoredReadingSessionPayload();
+            if (!payload) return false;
 
             try {
-                const payload = JSON.parse(stored);
                 if (payload.currentSpread !== currentSpread || payload.shuffleMode !== shuffleMode) return false;
                 const storedCards = Array.isArray(payload.drawnCards) ? payload.drawnCards : [];
                 let restoredAny = false;
@@ -1392,6 +1428,12 @@
                     document.getElementById('board-instruction').innerText = "Your interrupted reading has been restored. Continue when you are ready.";
                     document.getElementById('deal-button').classList.add('hidden');
                     document.getElementById('reset-button').classList.remove('hidden');
+
+                    const isCompleteReading = drawnCards.filter(Boolean).length === SPREADS[currentSpread].length;
+                    if (isCompleteReading) {
+                        revealOracleInterpretation({ scroll: false });
+                        restoreAiReadingSessionState(payload);
+                    }
                 }
 
                 return restoredAny;
@@ -2104,6 +2146,7 @@
 
             const numCards = SPREADS[currentSpread].length;
             drawnCards = [];
+            localStorage.removeItem(READING_SESSION_STORAGE_KEY);
 
             // Random draw cards from our deck (preventing duplicates)
             const availableDeck = [...deck];
@@ -2199,7 +2242,8 @@
         }
 
         // Presenting complete card spread meanings
-        function revealOracleInterpretation() {
+        function revealOracleInterpretation(options = {}) {
+            const { scroll = true } = options;
             const consoleSection = document.getElementById('reading-console');
             const container = document.getElementById('interpretation-cards-container');
             container.innerHTML = ''; // Reset
@@ -2242,8 +2286,8 @@
             });
 
             consoleSection.classList.remove('hidden');
-            // Auto smooth scroll down to visual interpretations console
-            consoleSection.scrollIntoView({ behavior: 'smooth' });
+            // Auto smooth scroll down to visual interpretations console when the user reveals cards live.
+            if (scroll) consoleSection.scrollIntoView({ behavior: 'smooth' });
         }
 
         // ================= AI INTERPRETATION LOGIC =================
@@ -2394,6 +2438,7 @@ Please provide a brief, tailored reading (maximum 3 short paragraphs). Do not gi
                     // Success render
                     outputTarget.innerHTML = parseCosmicMarkdown(text);
                     outputBox.classList.remove('hidden');
+                    saveAiReadingSessionState(text);
                     outputBox.scrollIntoView({ behavior: 'smooth' });
                 } else {
                     throw new Error("No output data returned from the active AI provider");
