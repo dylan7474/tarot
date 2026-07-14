@@ -33,6 +33,7 @@ const defaultState = {
   ollamaModelsList: [],
   userSettings: {},
   physicalDeck: null,
+  readingSession: null,
   updatedAt: null,
 };
 
@@ -178,9 +179,13 @@ async function serveStatic(request, response, pathname, root = ROOT) {
 
   try {
     const file = await fs.readFile(filePath);
-    response.writeHead(200, {
+    const headers = {
       'Content-Type': contentTypes[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
-    });
+    };
+    if (root === ASSET_CACHE_DIR) {
+      headers['Cache-Control'] = 'public, max-age=604800, immutable';
+    }
+    response.writeHead(200, headers);
     response.end(request.method === 'HEAD' ? undefined : file);
   } catch (error) {
     if (error.code === 'ENOENT' || error.code === 'EISDIR') {
