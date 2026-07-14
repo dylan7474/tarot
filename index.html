@@ -712,7 +712,7 @@
     <footer class="border-t border-cosmic-700/30 bg-cosmic-950/90 py-6 text-center text-xs text-cosmic-300">
         <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
             <p>© 2026 Cosmic Tarot. Built with PAMELA COLMAN SMITH's Public Domain artwork (1909).</p>
-            <p>Fallback Engine active. Connected directly with Github Repo Assets.</p>
+            <p id="asset-source-footer">Detecting tarot asset source...</p>
         </div>
     </footer>
 
@@ -731,6 +731,7 @@
         let manualActionMode = null;   // When set, ribbon clicks choose shuffle/cut points instead of drawing
         let manualDeckPrepared = false; // Manual readings require a shuffle/cut action before card selection opens
         const PHYSICAL_DECK_STORAGE_KEY = 'cosmic_tarot_physical_deck_v1';
+        const READING_SESSION_STORAGE_KEY = 'cosmic_tarot_reading_session_v1';
         const USER_SETTINGS_STORAGE_KEY = 'cosmic_tarot_user_settings_v1';
         const SERVER_STATE_ENDPOINT = '/api/state';
         let serverStorageAvailable = false;
@@ -766,7 +767,8 @@
                 ollamaModel: 'ollama_model',
                 ollamaModelsList: 'ollama_models_list',
                 userSettings: USER_SETTINGS_STORAGE_KEY,
-                physicalDeck: PHYSICAL_DECK_STORAGE_KEY
+                physicalDeck: PHYSICAL_DECK_STORAGE_KEY,
+                readingSession: READING_SESSION_STORAGE_KEY
             };
 
             Object.entries(storageMap).forEach(([serverKey, localKey]) => {
@@ -793,6 +795,7 @@
                 ollamaModelsList: parseStoredJson('ollama_models_list', []),
                 userSettings: parseStoredJson(USER_SETTINGS_STORAGE_KEY, {}),
                 physicalDeck: parseStoredJson(PHYSICAL_DECK_STORAGE_KEY, null),
+                readingSession: parseStoredJson(READING_SESSION_STORAGE_KEY, null),
                 updatedAt: new Date().toISOString()
             };
         }
@@ -1143,6 +1146,7 @@
         async function fetchTarotAssets() {
             const statusText = document.getElementById('status-text');
             const statusDot = document.getElementById('status-dot');
+            const assetSourceFooter = document.getElementById('asset-source-footer');
 
             // Attempt 1: Fetch server-owned cached assets. The Node server mirrors these from GitHub once.
             try {
@@ -1154,6 +1158,7 @@
                 imageBaseUrl = '/assets/cards/';
 
                 statusText.innerText = "Active Connection: Server asset cache loaded successfully.";
+                if (assetSourceFooter) assetSourceFooter.innerText = "Server asset cache active. Tarot data is served locally to reduce GitHub traffic.";
                 statusDot.className = "inline-block w-2.5 h-2.5 rounded-full bg-emerald-500";
                 console.log("Success: Loaded cached server assets.");
             }
@@ -1172,6 +1177,7 @@
                     imageBaseUrl = './cards/';
 
                     statusText.innerText = "Active Connection: Local Repo Assets loaded successfully.";
+                    if (assetSourceFooter) assetSourceFooter.innerText = "Local repository assets active. Tarot data is loaded from this app.";
                     statusDot.className = "inline-block w-2.5 h-2.5 rounded-full bg-emerald-500";
                     console.log("Success: Loaded local files.");
                 }
@@ -1189,11 +1195,13 @@
                         imageBaseUrl = 'https://raw.githubusercontent.com/metabismuth/tarot-json/master/cards/';
 
                         statusText.innerText = "Fallback Active: Connected & loaded directly from GitHub CDN.";
+                        if (assetSourceFooter) assetSourceFooter.innerText = "Fallback engine active. GitHub assets are only used because local/server assets were unavailable.";
                         statusDot.className = "inline-block w-2.5 h-2.5 rounded-full bg-emerald-500";
                         console.log("Success: Loaded GitHub remote files.");
                     } catch (remoteError) {
                         console.error("Critical: Could not load cached, local, or remote tarot data.", remoteError);
                         statusText.innerText = "Critical Error: Offline & no tarot assets found.";
+                        if (assetSourceFooter) assetSourceFooter.innerText = "Tarot assets unavailable. Start the Node server to refresh the local cache.";
                         statusDot.className = "inline-block w-2.5 h-2.5 rounded-full bg-red-500";
                     }
                 }
@@ -1269,6 +1277,80 @@
             persistStateToServer();
         }
 
+        function serializeDrawnCards() {
+            return drawnCards.map(cardState => {
+                if (!cardState || !cardState.card) return null;
+                return {
+                    name: cardState.card.name,
+                    isReversed: Boolean(cardState.isReversed)
+                };
+            });
+        }
+
+        function saveReadingSessionState() {
+            if (deck.length === 0) return;
+            const hasDrawnCards = drawnCards.some(Boolean);
+            const payload = {
+                currentSpread,
+                shuffleMode,
+                drawnCards: serializeDrawnCards(),
+                savedAt: new Date().toISOString()
+            };
+
+            if (hasDrawnCards) {
+                localStorage.setItem(READING_SESSION_STORAGE_KEY, JSON.stringify(payload));
+            } else {
+                localStorage.removeItem(READING_SESSION_STORAGE_KEY);
+            }
+            persistStateToServer();
+        }
+
+        function restoreReadingSessionState() {
+            const stored = localStorage.getItem(READING_SESSION_STORAGE_KEY);
+            if (!stored) return false;
+
+            try {
+                const payload = JSON.parse(stored);
+                if (payload.currentSpread !== currentSpread || payload.shuffleMode !== shuffleMode) return false;
+                const storedCards = Array.isArray(payload.drawnCards) ? payload.drawnCards : [];
+                let restoredAny = false;
+
+                storedCards.slice(0, SPREADS[currentSpread].length).forEach((storedCard, index) => {
+                    if (!storedCard || !storedCard.name) return;
+                    const matchingCard = deck.find(card => card.name === storedCard.name);
+                    if (!matchingCard) return;
+
+                    const restoredCard = {
+                        card: matchingCard,
+                        isReversed: Boolean(storedCard.isReversed)
+                    };
+                    drawnCards[index] = restoredCard;
+                    restoredAny = true;
+
+                    const cardImgEl = document.getElementById(`card-front-img-${index}`);
+                    if (cardImgEl) {
+                        cardImgEl.src = `${imageBaseUrl}${matchingCard.img}`;
+                        cardImgEl.style.transform = restoredCard.isReversed ? 'rotate(180deg)' : 'none';
+                    }
+                    const cardInnerEl = document.getElementById(`card-inner-${index}`);
+                    if (cardInnerEl) cardInnerEl.classList.add('flipped');
+                });
+
+                if (restoredAny) {
+                    document.getElementById('board-instruction').innerText = "Your interrupted reading has been restored. Continue when you are ready.";
+                    document.getElementById('deal-button').classList.add('hidden');
+                    document.getElementById('reset-button').classList.remove('hidden');
+                }
+
+                return restoredAny;
+            } catch (error) {
+                console.warn('Stored reading session could not be restored. Clearing interrupted reading state.', error);
+                localStorage.removeItem(READING_SESSION_STORAGE_KEY);
+                persistStateToServer();
+                return false;
+            }
+        }
+
         function loadStoredPhysicalDeck() {
             const stored = localStorage.getItem(PHYSICAL_DECK_STORAGE_KEY);
             if (!stored) return false;
@@ -1306,8 +1388,10 @@
             cutPiles = null;
             manualActionMode = null;
             manualDeckPrepared = false;
+            drawnCards = [];
+            localStorage.removeItem(READING_SESSION_STORAGE_KEY);
             savePhysicalDeckState();
-            setupSpreadBoard();
+            setupSpreadBoard({ restoreInterruptedSession: false });
             updateAltarView();
             renderRibbonSpread();
             playChime("C4");
@@ -1472,6 +1556,7 @@
             const drawnCardState = physicalDeck.splice(index, 1)[0];
             drawnCards[vacantSlotIndex] = drawnCardState;
             savePhysicalDeckState();
+            saveReadingSessionState();
 
             // Paint visual artwork coordinates to board slot
             const cardImgEl = document.getElementById(`card-front-img-${vacantSlotIndex}`);
@@ -1799,6 +1884,7 @@
             // Store inside drawn pool matching target slot sequence
             drawnCards[slotIndex] = drawnCardState;
             savePhysicalDeckState();
+            saveReadingSessionState();
 
             // Load visual artwork on the board
             const cardImgEl = document.getElementById(`card-front-img-${slotIndex}`);
@@ -1865,7 +1951,8 @@
             saveUserSettings();
         }
 
-        function setupSpreadBoard() {
+        function setupSpreadBoard(options = {}) {
+            const { restoreInterruptedSession = true } = options;
             const spreadLayout = document.getElementById('spread-layout');
             const consoleSection = document.getElementById('reading-console');
             
@@ -1934,6 +2021,10 @@
             } else {
                 document.getElementById('board-instruction').innerText = "Click Shuffle & Draw to start your reading";
             }
+
+            if (restoreInterruptedSession) {
+                restoreReadingSessionState();
+            }
         }
 
         // Generic click dispatcher for visual slot elements
@@ -1998,12 +2089,15 @@
             document.getElementById('board-instruction').innerText = "Click cards to reveal their prophecy";
             document.getElementById('deal-button').classList.add('hidden');
             document.getElementById('reset-button').classList.remove('hidden');
+            saveReadingSessionState();
         }
 
         // Reset the active board for consecutive readings without requiring refresh
         function resetReading() {
             // Clear current input question
             document.getElementById('oracle-question').value = '';
+            drawnCards = [];
+            localStorage.removeItem(READING_SESSION_STORAGE_KEY);
             saveUserSettings();
 
             // Clean the reading layout while preserving the perpetual physical deck.
@@ -2013,7 +2107,7 @@
                 savePhysicalDeckState();
             }
             manualActionMode = null;
-            setupSpreadBoard();
+            setupSpreadBoard({ restoreInterruptedSession: false });
             
             // Play resetting chime
             playChime("C4");
